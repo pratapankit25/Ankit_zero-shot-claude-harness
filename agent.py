@@ -15,6 +15,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
+# Enable ANSI escape codes on Windows (no-op on Unix)
+if sys.platform == "win32":
+    os.system("")
+
 # ── colours ──────────────────────────────────────────────────────────────────
 GREEN  = "\033[32m"
 RED    = "\033[31m"
@@ -69,7 +73,10 @@ def check_tools() -> None:
 
     v = cmd_version(["uv", "--version"])
     if v: ok(v)
-    else: fail("uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh")
+    elif sys.platform == "win32":
+        fail('uv not found — install: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"')
+    else:
+        fail("uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh")
 
     v = cmd_version(["claude", "--version"])
     if v: ok(v)
@@ -97,7 +104,8 @@ def check_env() -> None:
 
     env = ROOT / ".env"
     if not env.exists():
-        fail(".env not found — run: cp .env.example .env  and fill in your API key")
+        _cp = "copy" if sys.platform == "win32" else "cp"
+        fail(f".env not found — run: {_cp} .env.example .env  and fill in your API key")
         return
     ok(".env exists")
 
