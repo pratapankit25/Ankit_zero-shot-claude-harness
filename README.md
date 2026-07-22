@@ -14,6 +14,8 @@ Built spec-first with the [zero-shot SDD harness](spec/roadmap.md) — the full 
 
 Requires: Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20+, [pnpm](https://pnpm.io).
 
+Linux / macOS (bash):
+
 ```bash
 cp .env.example .env
 # edit .env → set AGENT_GEMINI_API_KEY=<your key>   (or AGENT_ANTHROPIC_API_KEY)
@@ -24,6 +26,24 @@ npx playwright install chromium   # E2E browser (one-time download)
 uv run alembic upgrade head
 uv run alembic current            # must print "0002 (head)" — blank output means no migration ran
 ```
+
+Windows (PowerShell) — one command per line (old PowerShell doesn't support `&&`):
+
+```powershell
+copy .env.example .env
+# edit .env → set AGENT_GEMINI_API_KEY=<your key>
+uv sync --extra dev
+cd frontend
+pnpm install
+pnpm build
+cd ..
+pnpm install
+npx playwright install chromium
+uv run alembic upgrade head
+uv run alembic current            # must print "0002 (head)"
+```
+
+Missing tools on Windows: uv → `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` · Node 20+ → nodejs.org · pnpm → `npm install -g pnpm`.
 
 ## Run
 
