@@ -45,7 +45,9 @@ def read_conn() -> sqlite3.Connection:
     if not path.exists():
         # create the empty store so ro-open succeeds before any upload
         write_conn().close()
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    # as_uri() yields a valid file:// URI on every platform (Windows backslashes
+    # break the naive f"file:{path}" form)
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
 
     def _authorizer(code: int, *_args) -> int:
         return sqlite3.SQLITE_OK if code in _ALLOWED_AUTH_CODES else sqlite3.SQLITE_DENY
