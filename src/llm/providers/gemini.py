@@ -43,12 +43,18 @@ def _usage(meta) -> tuple[int, int]:
     return int(meta.prompt_token_count or 0), int(meta.candidates_token_count or 0)
 
 
+# requested model -> working model, discovered once per process (a provider is
+# constructed per node call; without this cache every call would re-pay the 404+list)
+_MODEL_CACHE: dict[str, str] = {}
+
+
 class GeminiProvider:
     DEFAULT_MODEL = "gemini-3.1-pro"
 
     def __init__(self, api_key: str, model: str) -> None:
         self._client = genai.Client(api_key=api_key)
-        self._model = model or self.DEFAULT_MODEL
+        self._requested = model or self.DEFAULT_MODEL
+        self._model = _MODEL_CACHE.get(self._requested, self._requested)
         self._fallback_tried = False
 
     def _config(self, system: str | None):
@@ -86,6 +92,7 @@ class GeminiProvider:
                 raise
             log.info("gemini.model_fallback", requested=self._model, using=best)
             self._model = best
+            _MODEL_CACHE[self._requested] = best
             return fn()
 
     def generate(self, prompt: str, *, system: str | None = None):
