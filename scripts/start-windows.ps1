@@ -38,12 +38,21 @@ $nodeMajor = [int]((node --version).TrimStart("v").Split(".")[0])
 if ($nodeMajor -lt 20) { Fail "Node.js $(node --version) is too old - install Node 20+ from https://nodejs.org" }
 Write-Host "  node: OK ($(node --version))"
 
+$frontendTool = "pnpm"
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
     Write-Host "pnpm is not installed - installing it with npm (one time)..." -ForegroundColor Yellow
     npm install -g pnpm
     if ($LASTEXITCODE -ne 0) { Fail "Could not install pnpm. Run 'npm install -g pnpm' in a new terminal, then re-run." }
+    # a just-installed tool is often invisible to THIS session - refresh PATH from the registry
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = "$machinePath;$userPath;$env:APPDATA\npm"
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+        Write-Host "  pnpm installed but not visible in this window yet - using npm for this run." -ForegroundColor Yellow
+        $frontendTool = "npm"
+    }
 }
-Write-Host "  pnpm: OK ($(pnpm --version))"
+if ($frontendTool -eq "pnpm") { Write-Host "  pnpm: OK ($(pnpm --version))" } else { Write-Host "  npm: OK ($(npm --version))" }
 
 # ---------------------------------------------------------------- .env + key
 Step "Checking .env and API key"
@@ -67,10 +76,10 @@ if ($LASTEXITCODE -ne 0) { Fail "'uv sync' failed - see the messages above." }
 
 Step "Building the web interface"
 Push-Location frontend
-pnpm install
-if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "'pnpm install' failed - see above." }
-pnpm build
-if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "'pnpm build' failed - see above." }
+if ($frontendTool -eq "pnpm") { pnpm install } else { npm install }
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "Frontend package install failed - see above." }
+if ($frontendTool -eq "pnpm") { pnpm build } else { npm run build }
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "Frontend build failed - see above." }
 Pop-Location
 
 Step "Preparing the database"
