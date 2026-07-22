@@ -26,6 +26,8 @@ class AgentState(TypedDict, total=False):
     answer: str
     caveats: list
     followups: list
+    chart: dict | None       # {type, x, y, points[]} — deterministic, may be absent
+    flags: list              # [{kind, message}] computed anomaly flags
     usage: dict              # {input_tokens, output_tokens}
 
     # Control

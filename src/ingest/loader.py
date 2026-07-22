@@ -108,6 +108,47 @@ def _coerce_dates(df: pd.DataFrame, warnings: list[str]) -> pd.DataFrame:
     return df
 
 
+def materialize_derived(sql: str) -> dict:
+    """Materialize a validated SELECT as a new dataset table (Phase 2:
+    spec/capabilities/derived-datasets.md). Returns the same shape as load_csv."""
+    from uuid import uuid4 as _uuid4
+
+    try:
+        clean_sql = store.validate_select(sql)
+    except store.QueryError as exc:
+        raise IngestError(str(exc)) from exc
+
+    table_name = f"ds_{_uuid4().hex[:12]}"
+    conn = store.write_conn()
+    try:
+        try:
+            conn.execute(f'CREATE TABLE "{table_name}" AS {clean_sql}')
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            raise IngestError(
+                f"Could not materialize the result — the underlying data may have been deleted. ({exc})"
+            ) from exc
+        row_count = conn.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
+        df = pd.read_sql_query(f'SELECT * FROM "{table_name}" LIMIT 100000', conn)
+    finally:
+        conn.close()
+
+    if row_count == 0:
+        store.drop_table(table_name)
+        raise IngestError("The result has no rows — nothing to save as a dataset.")
+
+    warnings: list[str] = []
+    from ingest.profiler import profile_frame
+    columns, profile = profile_frame(df, {c: c for c in df.columns}, warnings)
+    return {
+        "table_name": table_name,
+        "row_count": int(row_count),
+        "columns": columns,
+        "profile": profile,
+    }
+
+
 def load_csv(data: bytes, original_filename: str) -> dict:
     """Parse + load one CSV fully into the analytics store.
 

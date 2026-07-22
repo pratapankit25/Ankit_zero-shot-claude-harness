@@ -17,6 +17,7 @@ class DatasetProfile(BaseModel):
     warnings: list[str] = []
     date_columns: list[str] = []
     profiled_rows: int = 0
+    provenance: dict | None = None   # derived datasets: {run_id, question, sql}
 
 
 class DatasetOut(BaseModel):

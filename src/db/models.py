@@ -34,6 +34,8 @@ class RunRow(Base):
     result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     caveats_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     followups_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chart_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    flags_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

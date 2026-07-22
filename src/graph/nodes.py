@@ -11,6 +11,8 @@ from pathlib import Path
 from config.settings import get_settings
 from db.models import ConversationRow, DatasetRow, RunRow
 from db.session import create_db_session
+from graph.anomalies import build_flags
+from graph.charts import build_chart_spec
 from graph.state import AgentState
 from graph.stream import emit, emit_step
 from ingest import store
@@ -254,6 +256,11 @@ def compose_answer(state: AgentState) -> AgentState:
         client = LLMClient()
         usage = state.get("usage", {})
         result = state.get("result", {})
+
+        # Phase 2: deterministic chart + anomaly flags from the executed result
+        chart = build_chart_spec(result.get("columns", []), result.get("rows", []))
+        flags = build_flags(result, state.get("datasets", []),
+                            (state.get("plan") or {}).get("dataset_ids", []), state.get("sql", ""))
         rows = result.get("rows", [])[: s.llm_result_rows]
         result_for_llm = json.dumps(
             {
@@ -280,7 +287,8 @@ def compose_answer(state: AgentState) -> AgentState:
         answer, caveats, followups = _split_answer(llm_result.text)
         scrubber.flush(answer)
         state["steps"][-1]["status"] = "done"
-        return {**state, "answer": answer, "caveats": caveats, "followups": followups, "usage": usage}
+        return {**state, "answer": answer, "caveats": caveats, "followups": followups,
+                "chart": chart, "flags": flags, "usage": usage}
     except LLMError as exc:
         return {**state, "error": str(exc)}
     except Exception as exc:
@@ -351,6 +359,8 @@ def _persist(state: AgentState, status: str) -> None:
         run.result_json = json.dumps(state.get("result") or {}, ensure_ascii=False, default=str)
         run.caveats_json = json.dumps(state.get("caveats", []), ensure_ascii=False)
         run.followups_json = json.dumps(state.get("followups", []), ensure_ascii=False)
+        run.chart_json = json.dumps(state.get("chart"), ensure_ascii=False, default=str)
+        run.flags_json = json.dumps(state.get("flags", []), ensure_ascii=False)
         usage = state.get("usage", {})
         run.input_tokens = usage.get("input_tokens", 0)
         run.output_tokens = usage.get("output_tokens", 0)

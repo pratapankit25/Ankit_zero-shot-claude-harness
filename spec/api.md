@@ -49,7 +49,19 @@ event: error      data: {"message"}    (terminal, instead of final)
 
 **Purpose:** same, non-streaming (integration tests, API consumers). **Response:** `{"data": RunDetail}`.
 
-`RunDetail` = `{run_id, conversation_id, status, question, answer, language, sql, steps[], result{columns,rows,row_count,truncated}, caveats[], followups[], usage{input_tokens,output_tokens}, duration_ms, error}`.
+`RunDetail` = `{run_id, conversation_id, status, question, answer, language, sql, steps[], result{columns,rows,row_count,truncated}, caveats[], followups[], chart{type,x,y,points[]}|null, flags[{kind,message}], usage{input_tokens,output_tokens}, duration_ms, error}`.
+
+### `GET /runs/{run_id}/export?format=xlsx|csv` *(Phase 2)*
+
+**Purpose:** full-result download; re-runs the audited SQL verbatim (cap 500k rows / 60 s). xlsx has a Data sheet + About sheet (question, SQL, timestamp); csv is UTF-8-BOM for Excel-safe Devanagari. 409 when the run isn't completed or the underlying dataset was deleted.
+
+### `POST /datasets/derived` *(Phase 2)*
+
+**Request:** `{"run_id": "...", "name": "Lucknow monthly 2025"}` → materializes the run's SQL as a new library dataset (`source="derived"`, provenance in its profile). 404 unknown run; 409 not derivable / underlying data gone / empty result.
+
+### `PATCH /datasets/{id}/columns/{name}` *(Phase 2)*
+
+**Request:** `{"description": "CCTNS crime head; POCSO grouped under Kidnapping"}` (≤500 chars) → stored in the dataset's dictionary and injected into every subsequent plan/SQL prompt. Returns the updated dataset.
 
 ### `GET /conversations`
 

@@ -16,10 +16,10 @@ While answering, the agent surfaces data-quality/statistical anomalies it can co
 ## External Calls
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| Analytics store | cheap companion checks (bounded) | skip flagging, never fail the run |
+| Analytics store | none in v1 — checks run on the already-fetched result + stored profiles | skip flagging, never fail the run |
 
 ## Business Rules
-- Flags are computed (SQL/stats), then phrased by the LLM — never invented by it.
+- Flags are computed AND phrased by code (deterministic templates) — the LLM never invents or words them.
 - Bounded cost: companion checks ≤2 queries, each under the standard timeout.
 
 ## Success Criteria

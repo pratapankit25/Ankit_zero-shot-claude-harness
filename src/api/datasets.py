@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 
 from api._common import api_error, ok
 from config.settings import get_settings
-from db.models import DatasetRow
+from db.models import DatasetRow, RunRow
 from db.session import get_session
 from domain.dataset import DatasetOut
+from domain.question import ColumnDescriptionPatch, DerivedDatasetRequest
 from ingest import store
-from ingest.loader import IngestError, load_csv
+from ingest.loader import IngestError, load_csv, materialize_derived
 from observability.events import get_logger
 
 router = APIRouter()
@@ -81,6 +82,63 @@ async def upload_datasets(files: list[UploadFile], session: Session = Depends(ge
         session.flush()
         out.append(_to_out(row))
     return ok(out)
+
+
+@router.post("/datasets/derived")
+def save_derived(req: DerivedDatasetRequest, session: Session = Depends(get_session)) -> dict:
+    """Save a run's full result as a reusable dataset (spec/capabilities/derived-datasets.md)."""
+    run = session.get(RunRow, req.run_id)
+    if run is None:
+        raise api_error("NOT_FOUND", f"Run {req.run_id} not found", 404)
+    if not run.sql_text or run.status != "completed":
+        raise api_error("NOT_DERIVABLE", "This run has no executed query to save.", 409)
+    try:
+        loaded = materialize_derived(run.sql_text)
+    except IngestError as exc:
+        raise api_error("DERIVE_FAILED", str(exc), 409)
+
+    profile = loaded["profile"]
+    profile["provenance"] = {
+        "run_id": run.id,
+        "question": run.input_text,
+        "sql": run.sql_text,
+    }
+    row = DatasetRow(
+        name=req.name,
+        original_filename=f"derived from: {(run.input_text or '')[:60]}",
+        table_name=loaded["table_name"],
+        source="derived",
+        status="ready",
+        row_count=loaded["row_count"],
+        columns_json=json.dumps(loaded["columns"], ensure_ascii=False),
+        profile_json=json.dumps(profile, ensure_ascii=False),
+    )
+    session.add(row)
+    session.flush()
+    log.info("dataset.derived", id=row.id, from_run=run.id, rows=row.row_count)
+    return ok(_to_out(row))
+
+
+@router.patch("/datasets/{dataset_id}/columns/{column_name}")
+def set_column_description(
+    dataset_id: str,
+    column_name: str,
+    patch: ColumnDescriptionPatch,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Data dictionary: annotate a column; the agent reads these in every prompt
+    (spec/capabilities/data-dictionary.md)."""
+    row = session.get(DatasetRow, dataset_id)
+    if row is None:
+        raise api_error("NOT_FOUND", f"Dataset {dataset_id} not found", 404)
+    columns = json.loads(row.columns_json or "[]")
+    target = next((c for c in columns if c.get("name") == column_name), None)
+    if target is None:
+        raise api_error("NOT_FOUND", f"Column {column_name} not found", 404)
+    target["description"] = patch.description
+    row.columns_json = json.dumps(columns, ensure_ascii=False)
+    log.info("dataset.dictionary_updated", id=dataset_id, column=column_name)
+    return ok(_to_out(row))
 
 
 @router.get("/datasets")

@@ -21,7 +21,7 @@ One uploaded (or, Phase 3, synced) tabular dataset in the library.
 | name | Text | yes | display name (from filename, editable later) |
 | original_filename | Text | yes | as uploaded |
 | table_name | Text | yes | `ds_<12-hex>` in the analytics store |
-| source | Text | yes | `csv` (Phase 3 adds `mssql`) |
+| source | Text | yes | `csv` \| `derived` (Phase 3 adds `mssql`) |
 | status | Text | yes | `ready` \| `error` |
 | error_message | Text | no | parse/load failure reason |
 | row_count | Integer | no | full loaded row count |
@@ -55,6 +55,8 @@ One question→answer turn.
 | steps_json | Text (JSON) | no | full step/attempt trace |
 | result_json | Text (JSON) | no | `{columns, rows≤200, row_count, truncated}` preview |
 | caveats_json / followups_json | Text (JSON) | no | |
+| chart_json | Text (JSON) | no | Phase 2: `{type: bar\|line, x, y, points[]}` derived from the result |
+| flags_json | Text (JSON) | no | Phase 2: computed anomaly flags `[{kind, message}]` |
 | input_tokens / output_tokens | Integer | no | usage accounting (cost dashboard source, Phase 4) |
 | duration_ms | Integer | no | |
 | created_at / updated_at | TIMESTAMP | yes | |

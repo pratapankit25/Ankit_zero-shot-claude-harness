@@ -14,9 +14,7 @@ When a result is chartable (time series, ranked categories, comparisons), the ag
 | chart spec `{type: bar\|line, x, y, series?, title}` | JSON on RunDetail | client renders (no chart lib on the server) |
 
 ## External Calls
-| System | Operation | On Failure |
-|--------|-----------|------------|
-| LLM (compose extended) | choose chart-worthiness + axes | degrade to no chart, never fail the run |
+None — the chart spec is derived deterministically from the executed result's shape (2 columns, numeric measure, date-like vs categorical axis). No LLM call, no extra failure mode; unchartable shapes simply yield no chart.
 
 ## Business Rules
 - Chart data comes from the executed result rows only (≤200), never re-queried or invented.

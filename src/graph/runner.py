@@ -37,6 +37,8 @@ def run_detail_from_row(run: RunRow) -> dict:
         "result": json.loads(run.result_json or "null"),
         "caveats": json.loads(run.caveats_json or "[]"),
         "followups": json.loads(run.followups_json or "[]"),
+        "chart": json.loads(run.chart_json or "null"),
+        "flags": json.loads(run.flags_json or "[]"),
         "usage": {"input_tokens": run.input_tokens or 0, "output_tokens": run.output_tokens or 0},
         "duration_ms": run.duration_ms,
         "error": run.error_message,
