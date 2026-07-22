@@ -12,6 +12,11 @@ SAMPLES = FIXTURES / "samples"
 def _reset_settings_singleton():
     import config.settings as m
     m._settings = None
+    try:
+        from api.auth import invalidate_users_cache
+        invalidate_users_cache()   # the users-exist TTL cache must not leak across tests
+    except Exception:
+        pass
     yield
     m._settings = None
 
