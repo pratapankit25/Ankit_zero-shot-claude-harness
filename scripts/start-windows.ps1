@@ -1,5 +1,6 @@
-# UP Police Data Analyst — one-click setup + run (Windows PowerShell 5.1+)
+﻿# UP Police Data Analyst - one-click setup + run (Windows PowerShell 5.1+)
 # Run via Start-Windows.bat (double-click). Safe to re-run any time.
+# NOTE: this file must stay pure ASCII (PowerShell 5.1 reads BOM-less files as ANSI).
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $root
@@ -14,7 +15,7 @@ function Fail($msg) {
 
 function Step($msg) { Write-Host ""; Write-Host ">> $msg" -ForegroundColor Cyan }
 
-Write-Host "=== UP Police Data Analyst — setup & run ===" -ForegroundColor Green
+Write-Host "=== UP Police Data Analyst - setup and run ===" -ForegroundColor Green
 Write-Host "Folder: $root"
 
 # ---------------------------------------------------------------- tools
@@ -25,20 +26,20 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     if ($ans -eq "" -or $ans -match "^[Yy]") {
         powershell -NoProfile -ExecutionPolicy ByPass -Command "irm https://astral.sh/uv/install.ps1 | iex"
         $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
-        if (-not (Get-Command uv -ErrorAction SilentlyContinue)) { Fail "uv installed but not found — close this window and run Start-Windows.bat again." }
+        if (-not (Get-Command uv -ErrorAction SilentlyContinue)) { Fail "uv installed but not found - close this window and run Start-Windows.bat again." }
     } else { Fail "uv is required. Install from https://docs.astral.sh/uv/ then re-run." }
 }
 Write-Host "  uv: OK ($(uv --version))"
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Fail "Node.js is not installed. Install Node 20+ from https://nodejs.org (LTS), then re-run this launcher."
+    Fail "Node.js is not installed. Install Node 20+ (LTS) from https://nodejs.org then re-run this launcher."
 }
 $nodeMajor = [int]((node --version).TrimStart("v").Split(".")[0])
-if ($nodeMajor -lt 20) { Fail "Node.js $(node --version) is too old — install Node 20+ from https://nodejs.org" }
+if ($nodeMajor -lt 20) { Fail "Node.js $(node --version) is too old - install Node 20+ from https://nodejs.org" }
 Write-Host "  node: OK ($(node --version))"
 
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-    Write-Host "pnpm is not installed — installing it with npm (one time)..." -ForegroundColor Yellow
+    Write-Host "pnpm is not installed - installing it with npm (one time)..." -ForegroundColor Yellow
     npm install -g pnpm
     if ($LASTEXITCODE -ne 0) { Fail "Could not install pnpm. Run 'npm install -g pnpm' in a new terminal, then re-run." }
 }
@@ -51,7 +52,7 @@ $envText = Get-Content ".env" -Raw
 $hasGemini = $envText -match "(?m)^AGENT_GEMINI_API_KEY=\S+"
 $hasAnthropic = $envText -match "(?m)^AGENT_ANTHROPIC_API_KEY=\S+"
 if (-not ($hasGemini -or $hasAnthropic)) {
-    Write-Host "A Gemini API key is needed (free tier: https://aistudio.google.com/apikey — keys start with AIza)." -ForegroundColor Yellow
+    Write-Host "A Gemini API key is needed. Free at https://aistudio.google.com/apikey (keys start with AIza)." -ForegroundColor Yellow
     $key = Read-Host "Paste your Gemini API key"
     if (-not $key) { Fail "No key entered. Get one at https://aistudio.google.com/apikey and re-run." }
     $envText = $envText -replace "(?m)^AGENT_GEMINI_API_KEY=.*$", "AGENT_GEMINI_API_KEY=$key"
@@ -62,19 +63,19 @@ if (-not ($hasGemini -or $hasAnthropic)) {
 # ---------------------------------------------------------------- setup
 Step "Installing Python packages (first run may take a few minutes)"
 uv sync --extra dev
-if ($LASTEXITCODE -ne 0) { Fail "'uv sync' failed — see the messages above." }
+if ($LASTEXITCODE -ne 0) { Fail "'uv sync' failed - see the messages above." }
 
 Step "Building the web interface"
 Push-Location frontend
 pnpm install
-if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "'pnpm install' failed — see above." }
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "'pnpm install' failed - see above." }
 pnpm build
-if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "'pnpm build' failed — see above." }
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "'pnpm build' failed - see above." }
 Pop-Location
 
 Step "Preparing the database"
 uv run alembic upgrade head
-if ($LASTEXITCODE -ne 0) { Fail "Database migration failed — see above." }
+if ($LASTEXITCODE -ne 0) { Fail "Database migration failed - see above." }
 $rev = (uv run alembic current) -join " "
 if ($rev -notmatch "0002") { Fail "Migration did not apply (alembic current: '$rev')." }
 Write-Host "  Database ready ($rev)"
@@ -82,7 +83,7 @@ Write-Host "  Database ready ($rev)"
 # ---------------------------------------------------------------- run
 Step "Starting the server on http://localhost:8001"
 Write-Host ""
-Write-Host "  KEEP THIS WINDOW OPEN — closing it stops the app." -ForegroundColor Yellow
+Write-Host "  KEEP THIS WINDOW OPEN - closing it stops the app." -ForegroundColor Yellow
 Write-Host "  Your browser will open automatically when it's ready." -ForegroundColor Yellow
 Write-Host ""
 
