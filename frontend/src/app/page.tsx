@@ -6,14 +6,18 @@ import remarkGfm from 'remark-gfm'
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import type { ChartSpec, ConversationSummary, Dataset, RunDetail, Step } from './types'
+import { AdminPanel, LoginGate, ReportsPanel, SourcesPanel } from './components/Panels'
+import type { ChartSpec, ConversationSummary, Dataset, ReportDetail, RunDetail, Step, User } from './types'
 
-const COMING_SOON: { label: string; phase: string; tone: string }[] = [
-  { label: 'MsSQL nightly sync', phase: 'Phase 3', tone: 'text-violet-300/70 border-violet-800' },
-  { label: 'Scheduled summaries', phase: 'Phase 3', tone: 'text-violet-300/70 border-violet-800' },
-  { label: 'Login & district roles', phase: 'Phase 4', tone: 'text-amber-300/70 border-amber-800' },
-  { label: 'Cost dashboard', phase: 'Phase 4', tone: 'text-amber-300/70 border-amber-800' },
-]
+function staleBadge(d: Dataset): { label: string; warn: boolean } {
+  if (d.source === 'mssql') {
+    if (!d.synced_at) return { label: 'never synced', warn: true }
+    const age = Date.now() - new Date(d.synced_at).getTime()
+    const stale = age > 36 * 3600 * 1000
+    return { label: `synced ${d.synced_at.slice(0, 16).replace('T', ' ')}`, warn: stale }
+  }
+  return { label: d.created_at ? `uploaded ${d.created_at.slice(0, 10)}` : '', warn: false }
+}
 
 interface Turn extends Partial<RunDetail> {
   question: string
@@ -108,6 +112,10 @@ export default function Home() {
   const [savedFor, setSavedFor] = useState<string | null>(null)
   const [editingCol, setEditingCol] = useState<{ ds: string; col: string } | null>(null)
   const [editVal, setEditVal] = useState('')
+  const [auth, setAuth] = useState<{ loading: boolean; required: boolean; user: User | null }>({ loading: true, required: false, user: null })
+  const [report, setReport] = useState<ReportDetail | null>(null)   // non-null → report view replaces chat
+  const [editingDistrict, setEditingDistrict] = useState<string | null>(null)
+  const [districtVal, setDistrictVal] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -128,8 +136,44 @@ export default function Home() {
       setConversations((await r.json()).data ?? [])
     } catch { /* banner already handled by datasets fetch */ }
   }
-  useEffect(() => { refreshDatasets(); refreshConversations() }, [])
+  async function refreshAuth() {
+    try {
+      const r = await fetch('/auth/me')
+      const j = await r.json()
+      setAuth({ loading: false, required: j.data.auth_required, user: j.data.user })
+    } catch {
+      setAuth({ loading: false, required: false, user: null })
+    }
+  }
+  useEffect(() => { refreshAuth() }, [])
+  useEffect(() => {
+    if (!auth.loading && (!auth.required || auth.user)) { refreshDatasets(); refreshConversations() }
+  }, [auth.loading, auth.required, auth.user])
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [turns])
+
+  const role = auth.user?.role ?? null
+  const canEdit = !auth.required || role === 'admin' || role === 'analyst'
+  const isAdmin = !auth.required || role === 'admin'
+
+  async function openReport(id: string) {
+    const r = await fetch(`/reports/${id}`)
+    if (r.ok) setReport((await r.json()).data)
+  }
+
+  async function signOut() {
+    await fetch('/auth/logout', { method: 'POST' })
+    setAuth(a => ({ ...a, user: null }))
+    setTurns([]); setConversationId(null); setReport(null)
+  }
+
+  async function saveDistrict(dsId: string) {
+    await fetch(`/datasets/${dsId}/district`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ district: districtVal.trim() || null }),
+    })
+    setEditingDistrict(null); setDistrictVal('')
+    await refreshDatasets()
+  }
 
   async function openConversation(id: string) {
     const r = await fetch(`/conversations/${id}`)
@@ -211,6 +255,7 @@ export default function Home() {
   async function ask(question: string) {
     const q = question.trim()
     if (!q || running) return
+    setReport(null)
     setInput('')
     setRunning(true)
     setElapsed(0)
@@ -277,6 +322,13 @@ export default function Home() {
 
   const libraryEmpty = datasets !== null && datasets.length === 0
 
+  if (auth.loading) {
+    return <div className="grid min-h-screen place-items-center bg-slate-950 text-sm text-slate-400">Loading…</div>
+  }
+  if (auth.required && !auth.user) {
+    return <LoginGate onAuthed={u => setAuth(a => ({ ...a, user: u }))} />
+  }
+
   return (
     <div className="flex h-screen bg-slate-100">
       {/* ---------------------------- sidebar ---------------------------- */}
@@ -292,13 +344,15 @@ export default function Home() {
         <section className="px-4 py-4" data-testid="datasets-panel">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Datasets</h2>
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="rounded-lg bg-gradient-to-b from-amber-400 to-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md shadow-amber-900/30 transition hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-50"
-            >
-              {uploading ? 'Uploading…' : '⬆ Upload CSVs'}
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="rounded-lg bg-gradient-to-b from-amber-400 to-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md shadow-amber-900/30 transition hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-50"
+              >
+                {uploading ? 'Uploading…' : '⬆ Upload CSVs'}
+              </button>
+            )}
             <input ref={fileRef} type="file" accept=".csv,text/csv" multiple hidden data-testid="file-input"
               onChange={e => handleUpload(e.target.files)} />
           </div>
@@ -320,13 +374,35 @@ export default function Home() {
                     <div className="min-w-0">
                       <p className="truncate font-medium text-white" title={d.original_filename}>{d.name}</p>
                       {d.status === 'ready' ? (
-                        <p className="text-[11px] tabular-nums text-slate-400">{d.row_count?.toLocaleString('en-IN')} rows × {d.columns.length} cols · <span className={`rounded px-1 py-px text-[10px] tracking-wide ${d.source === 'derived' ? 'bg-amber-900/60 text-amber-300' : 'bg-slate-800 text-slate-300'}`}>{d.source.toUpperCase()}</span></p>
+                        <>
+                          <p className="text-[11px] tabular-nums text-slate-400">{d.row_count?.toLocaleString('en-IN')} rows × {d.columns.length} cols · <span className={`rounded px-1 py-px text-[10px] tracking-wide ${d.source === 'derived' ? 'bg-amber-900/60 text-amber-300' : d.source === 'mssql' ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-800 text-slate-300'}`}>{d.source.toUpperCase()}</span></p>
+                          <p className={`text-[10px] ${staleBadge(d).warn ? 'text-amber-400' : 'text-slate-500'}`}>
+                            {staleBadge(d).warn ? '⚠ ' : ''}{staleBadge(d).label}
+                            {editingDistrict === d.id ? (
+                              <input autoFocus value={districtVal}
+                                onChange={e => setDistrictVal(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') saveDistrict(d.id); if (e.key === 'Escape') setEditingDistrict(null) }}
+                                onBlur={() => saveDistrict(d.id)}
+                                placeholder="district…"
+                                className="ml-1 w-24 rounded border border-amber-500/60 bg-slate-900 px-1 text-[10px] text-amber-100 focus:outline-none" />
+                            ) : (
+                              <>
+                                {d.district ? <span className="ml-1 rounded bg-sky-900/60 px-1 text-sky-300">{d.district}</span> : null}
+                                {canEdit && (
+                                  <button onClick={() => { setEditingDistrict(d.id); setDistrictVal(d.district || '') }}
+                                    title="Tag to a district (viewers see only their district)"
+                                    className="ml-1 text-slate-600 hover:text-sky-300">◈</button>
+                                )}
+                              </>
+                            )}
+                          </p>
+                        </>
                       ) : (
                         <p className="text-[11px] leading-snug text-rose-300">{d.error_message}</p>
                       )}
                     </div>
                   </div>
-                  {confirmDelete === d.id ? (
+                  {canEdit && (confirmDelete === d.id ? (
                     <span className="flex shrink-0 gap-1">
                       <button onClick={() => deleteDataset(d.id)} className="rounded-md bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-rose-500">Delete</button>
                       <button onClick={() => setConfirmDelete(null)} className="rounded-md border border-slate-600 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-white/10">Keep</button>
@@ -334,7 +410,7 @@ export default function Home() {
                   ) : (
                     <button onClick={() => setConfirmDelete(d.id)} aria-label={`Delete ${d.name}`}
                       className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] text-slate-500 opacity-0 transition focus:opacity-100 group-hover:opacity-100 hover:bg-rose-900/50 hover:text-rose-300">✕</button>
-                  )}
+                  ))}
                 </div>
                 {confirmDelete === d.id && (
                   <p className="mt-2 text-[11px] leading-snug text-rose-300">Removes “{d.name}” and its data. Past answers stay in the audit log.</p>
@@ -413,31 +489,69 @@ export default function Home() {
           </ul>
         </section>
 
-        <section className="mt-auto border-t border-white/10 px-4 py-4" data-testid="coming-soon">
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Coming soon</h2>
-          <p className="mb-2.5 text-[11px] text-slate-500">Planned — not built yet.</p>
-          <div className="flex flex-wrap gap-1.5">
-            {COMING_SOON.map(s => (
-              <span key={s.label} title="Planned — not built yet"
-                className={`cursor-not-allowed select-none rounded-full border border-dashed px-2.5 py-1 text-[11px] ${s.tone}`}>
-                🔒 {s.label} · {s.phase}
-              </span>
-            ))}
-          </div>
-        </section>
+        {canEdit && (
+          <details className="border-t border-white/10 px-4 py-3" data-testid="sources-section">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:text-amber-300">MsSQL source</summary>
+            <div className="pt-2"><SourcesPanel visible /></div>
+          </details>
+        )}
+        {canEdit && (
+          <details className="border-t border-white/10 px-4 py-3" data-testid="reports-section">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:text-amber-300">Scheduled briefs</summary>
+            <div className="pt-2"><ReportsPanel visible isAdmin={isAdmin} onOpenReport={openReport} /></div>
+          </details>
+        )}
+        {isAdmin && (
+          <details className="border-t border-white/10 px-4 py-3" data-testid="admin-section">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:text-amber-300">Administration</summary>
+            <div className="pt-2">
+              <AdminPanel visible authRequired={auth.required} me={auth.user}
+                onUsersChanged={() => refreshAuth()} />
+            </div>
+          </details>
+        )}
+        <div className="mt-auto" />
       </aside>
 
       {/* ---------------------------- chat pane ---------------------------- */}
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-3 backdrop-blur">
           <p className="truncate text-sm font-semibold text-slate-700">
-            {conversationId ? (conversations.find(c => c.id === conversationId)?.title ?? 'Conversation') : 'New conversation'}
+            {report ? report.title : conversationId ? (conversations.find(c => c.id === conversationId)?.title ?? 'Conversation') : 'New conversation'}
           </p>
-          <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Phase 2 · live
+          <span className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> v0.1 · live
+            </span>
+            {auth.user && (
+              <span className="flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600" data-testid="user-chip">
+                {auth.user.username} · {auth.user.role}{auth.user.district ? ` · ${auth.user.district}` : ''}
+                <button onClick={signOut} className="text-slate-400 hover:text-rose-600" title="Sign out">⏻</button>
+              </span>
+            )}
           </span>
         </div>
 
+        {report ? (
+          <div className="flex-1 overflow-y-auto px-6 py-6" data-testid="report-view">
+            <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <button onClick={() => setReport(null)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-amber-500 hover:text-amber-700">← Back to chat</button>
+                <a href={`/reports/${report.id}/pdf`} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-emerald-500 hover:text-emerald-700">⬇ PDF</a>
+              </div>
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{report.content_md}</ReactMarkdown>
+              </div>
+              {report.deliveries.length > 0 && (
+                <div className="mt-4 border-t border-slate-100 pt-2 text-xs text-slate-500">
+                  {report.deliveries.map((d, i) => (
+                    <p key={i}>✉ {d.recipient} — {d.status === 'sent' ? 'delivered' : `failed after ${d.attempts} attempts (${d.error})`}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {turns.length === 0 && (
             <div className="mx-auto mt-20 max-w-lg text-center">
@@ -568,6 +682,10 @@ export default function Home() {
                         )}
                       </div>
 
+                      {t.freshness && (
+                        <p className="mt-2 text-[11px] text-slate-400" data-testid="freshness">🕐 {t.freshness}</p>
+                      )}
+
                       {t.run_id && t.sql && (t.result?.rows.length ?? 0) > 0 && (
                         <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="result-actions">
                           <a href={`/runs/${t.run_id}/export?format=xlsx`}
@@ -576,6 +694,9 @@ export default function Home() {
                           <a href={`/runs/${t.run_id}/export?format=csv`}
                             className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
                             ⬇ CSV</a>
+                          <a href={`/runs/${t.run_id}/pdf?lang=both`} title="Bilingual briefing PDF (English + Hindi)"
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                            ⬇ PDF (EN+हिं)</a>
                           {savingFor === t.run_id ? (
                             <span className="flex items-center gap-1.5">
                               <input
@@ -622,6 +743,7 @@ export default function Home() {
           </div>
           <div ref={chatEndRef} />
         </div>
+        )}
 
         {banner && (
           <p className="mx-6 mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800">{banner}</p>

@@ -38,10 +38,11 @@ test('workspace loads, styled, with empty states', async ({ page }) => {
   await expect(page.getByText('No datasets yet')).toBeVisible()
   await expect(page.getByText('Two steps:')).toBeVisible()
 
-  // coming-soon stubs are labelled so they never read as bugs
-  const stubs = page.getByTestId('coming-soon')
-  await expect(stubs.getByText('MsSQL nightly sync · Phase 3')).toBeVisible()
-  await expect(stubs.getByText('Planned — not built yet.')).toBeVisible()
+  // all phases real: sources + scheduled-briefs sections replace the old stubs
+  await expect(page.getByTestId('sources-section')).toBeVisible()
+  await expect(page.getByTestId('reports-section')).toBeVisible()
+  await page.getByTestId('sources-section').locator('summary').click()
+  await expect(page.getByText(/Not configured|Connected to/)).toBeVisible()
 })
 
 test('uploading CSVs shows profiles; delete removes', async ({ page }) => {
