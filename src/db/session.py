@@ -11,8 +11,12 @@ _SessionLocal: sessionmaker | None = None
 def _get_engine() -> Engine:
     global _engine
     if _engine is None:
+        from pathlib import Path
         from config.settings import get_settings
-        _engine = create_engine(get_settings().database_url, echo=False)
+        url = get_settings().database_url
+        if url.startswith("sqlite:///"):
+            Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
+        _engine = create_engine(url, echo=False)
     return _engine
 
 

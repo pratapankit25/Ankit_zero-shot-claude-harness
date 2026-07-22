@@ -21,7 +21,10 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from settings
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+_db_url = get_settings().database_url
+if _db_url.startswith("sqlite:///"):
+    Path(_db_url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
+config.set_main_option("sqlalchemy.url", _db_url)
 
 
 def run_migrations_offline() -> None:

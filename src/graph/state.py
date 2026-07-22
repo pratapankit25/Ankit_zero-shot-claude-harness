@@ -2,8 +2,32 @@ from typing import TypedDict
 
 
 class AgentState(TypedDict, total=False):
+    # Identity
     run_id: str
-    input_text: str
-    output_text: str
+    conversation_id: str
+
+    # Input
+    question: str
+    history: list            # [{question, answer, sql}], newest last, ≤ settings.history_turns
+    datasets: list           # registry snapshot for prompts
+
+    # Pipeline
+    language: str            # "en" | "hi" | "hinglish"
+    mode: str                # "answer" | "clarify"
+    plan: dict               # {approach, dataset_ids, steps}
+    sql: str
+    sql_attempts: list       # [{sql, error | row_count}]
+    iterations: int
+    empty_retries: int
+    result: dict             # {columns, rows, row_count, truncated}
+    steps: list              # user-facing ticker log
+
+    # Output
+    answer: str
+    caveats: list
+    followups: list
+    usage: dict              # {input_tokens, output_tokens}
+
+    # Control
     error: str | None
-    messages: list          # [{role: "user"|"assistant", content: str}, ...] — chat-turn history
+    status: str              # completed | failed | clarification

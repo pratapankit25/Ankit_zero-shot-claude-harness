@@ -1,0 +1,48 @@
+{
+  "total_fir_rows": 3200,
+  "total_call_rows": 2400,
+  "total_personnel_rows": 24,
+  "fir_2025_by_district": {
+    "Agra": 104,
+    "Ghaziabad": 81,
+    "Gorakhpur": 73,
+    "Kanpur Nagar": 192,
+    "Lucknow": 276,
+    "Meerut": 114,
+    "Prayagraj": 122,
+    "Varanasi": 117
+  },
+  "top_district_2025": "Lucknow",
+  "top_district_2025_count": 276,
+  "top_district_2025_hindi": "लखनऊ",
+  "lucknow_2025_by_month": {
+    "2025-01": 50,
+    "2025-02": 39,
+    "2025-03": 42,
+    "2025-04": 53,
+    "2025-05": 50,
+    "2025-06": 42
+  },
+  "top_fir_per_officer_district": "Lucknow",
+  "min_fir_per_officer_district": "Gorakhpur",
+  "fir_per_officer_2025": {
+    "Agra": 0.4262,
+    "Ghaziabad": 0.3476,
+    "Gorakhpur": 0.2526,
+    "Kanpur Nagar": 0.9231,
+    "Lucknow": 1.5419,
+    "Meerut": 0.3476,
+    "Prayagraj": 0.4692,
+    "Varanasi": 0.5519
+  },
+  "district_aliases": {
+    "Lucknow": "लखनऊ",
+    "Kanpur Nagar": "कानपुर नगर",
+    "Varanasi": "वाराणसी",
+    "Prayagraj": "प्रयागराज",
+    "Agra": "आगरा",
+    "Meerut": "मेरठ",
+    "Gorakhpur": "गोरखपुर",
+    "Ghaziabad": "गाज़ियाबाद"
+  }
+}
