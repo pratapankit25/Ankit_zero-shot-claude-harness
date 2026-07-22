@@ -76,7 +76,14 @@ if ($LASTEXITCODE -ne 0) { Fail "'uv sync' failed - see the messages above." }
 
 Step "Building the web interface"
 Push-Location frontend
-if ($frontendTool -eq "pnpm") { pnpm install } else { npm install }
+if ($frontendTool -eq "pnpm") {
+    pnpm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  pnpm blocked or failed the install - falling back to npm (fresh resolution)..." -ForegroundColor Yellow
+        $frontendTool = "npm"
+    }
+}
+if ($frontendTool -eq "npm") { npm install }
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "Frontend package install failed - see above." }
 if ($frontendTool -eq "pnpm") { pnpm build } else { npm run build }
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "Frontend build failed - see above." }
