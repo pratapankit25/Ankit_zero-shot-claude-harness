@@ -18,8 +18,9 @@ def _reset_settings_singleton():
 
 @pytest.fixture(autouse=True)
 def _isolated_analytics(tmp_path, monkeypatch):
-    """Every test gets its own analytics store file."""
+    """Every test gets its own analytics store file; no background scheduler."""
     monkeypatch.setenv("AGENT_ANALYTICS_DB_PATH", str(tmp_path / "analytics.db"))
+    monkeypatch.setenv("AGENT_SCHEDULER", "0")
     yield
 
 

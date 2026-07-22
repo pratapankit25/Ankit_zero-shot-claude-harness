@@ -72,9 +72,13 @@ def run_select(
     *,
     timeout_s: float | None = None,
     row_cap: int | None = None,
+    allowed_tables: list[str] | None = None,
 ) -> dict:
     """Validate + execute one SELECT. Returns {columns, rows, row_count, truncated}.
 
+    allowed_tables (district scoping, spec/capabilities/auth-rbac.md): when given,
+    the authorizer denies reads of any ds_* table outside the list — even
+    hand-crafted SQL naming another district's table is blocked.
     Raises QueryError with a message safe to feed back to the SQL-writing LLM.
     """
     s = get_settings()
@@ -83,6 +87,18 @@ def run_select(
     sql = validate_select(sql)
 
     conn = read_conn()
+    if allowed_tables is not None:
+        allowed = set(allowed_tables)
+
+        def _scoped_authorizer(code: int, arg1, *_rest) -> int:
+            if code not in _ALLOWED_AUTH_CODES:
+                return sqlite3.SQLITE_DENY
+            if code == sqlite3.SQLITE_READ and isinstance(arg1, str) \
+                    and arg1.startswith("ds_") and arg1 not in allowed:
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        conn.set_authorizer(_scoped_authorizer)
     deadline = time.monotonic() + timeout_s
     conn.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 50_000)
     try:

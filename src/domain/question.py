@@ -66,6 +66,7 @@ class RunDetail(BaseModel):
     usage: UsageOut = UsageOut()
     duration_ms: int | None = None
     error: str | None = None
+    freshness: str | None = None
     created_at: str | None = None
 
 

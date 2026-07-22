@@ -16,6 +16,8 @@ dependencies = [
     "pandas>=2.2",
     "python-multipart>=0.0.9",
     "openpyxl>=3.1",
+    "python-tds>=1.15",
+    "fpdf2>=2.7",
 ]
 
 [project.optional-dependencies]

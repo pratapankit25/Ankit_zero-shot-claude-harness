@@ -68,7 +68,7 @@ def test_ask_returns_detail(api_client):
         r = api_client.post("/questions", json={"question": "how many?"})
     assert r.status_code == 200
     assert r.json()["data"]["answer"] == "**42**"
-    rq.assert_called_once_with("how many?", None)
+    rq.assert_called_once_with("how many?", None, user=None)
 
 
 def test_ask_blank_question_422(api_client):
@@ -77,7 +77,7 @@ def test_ask_blank_question_422(api_client):
 
 
 def test_stream_emits_sse_events(api_client):
-    def fake_run(question, conversation_id=None, on_event=None):
+    def fake_run(question, conversation_id=None, on_event=None, user=None):
         on_event({"type": "run", "run_id": "r1", "conversation_id": "c1"})
         on_event({"type": "step", "label_en": "Writing SQL", "label_hi": "SQL लिख रहा हूँ", "status": "start"})
         on_event({"type": "answer_delta", "text": "**42**"})

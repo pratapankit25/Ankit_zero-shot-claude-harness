@@ -32,4 +32,6 @@ class DatasetOut(BaseModel):
     size_bytes: int | None = None
     columns: list[ColumnInfo] = []
     profile: DatasetProfile | None = None
+    district: str | None = None
+    synced_at: str | None = None
     created_at: str | None = None

@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -20,23 +20,50 @@ EXPORT_ROW_CAP = 500_000
 EXPORT_TIMEOUT_S = 60.0
 
 
-@router.get("/runs/{run_id}")
-def get_run(run_id: str, session: Session = Depends(get_session)) -> dict:
-    """Audit detail for one question run (spec/capabilities/audit-trail.md)."""
+def _guarded_run(run_id: str, request, session: Session) -> RunRow:
+    from api.auth import require_role, require_user, users_exist_cached
     run = session.get(RunRow, run_id)
     if run is None:
         raise api_error("NOT_FOUND", f"Run {run_id} not found", 404)
-    return ok(run_detail_from_row(run))
+    if users_exist_cached():
+        user = require_user(request)
+        if user is None:
+            raise api_error("AUTH_REQUIRED", "Login required.", 401)
+        if user["role"] == "viewer" and run.user_id != user["id"]:
+            raise api_error("FORBIDDEN", "You can only access your own runs.", 403)
+    return run
+
+
+@router.get("/runs/{run_id}")
+def get_run(run_id: str, request: Request, session: Session = Depends(get_session)) -> dict:
+    """Audit detail for one question run (spec/capabilities/audit-trail.md)."""
+    return ok(run_detail_from_row(_guarded_run(run_id, request, session)))
+
+
+@router.get("/runs/{run_id}/pdf")
+def run_pdf(run_id: str, request: Request, lang: str = "both",
+            session: Session = Depends(get_session)) -> Response:
+    """Bilingual briefing PDF of one answer (spec/capabilities/bilingual-reports.md)."""
+    if lang not in ("en", "hi", "both"):
+        raise api_error("BAD_LANG", "lang must be en, hi or both", 400)
+    run = _guarded_run(run_id, request, session)
+    if run.status != "completed":
+        raise api_error("NOT_READY", "Only completed answers can become a report.", 409)
+    from reports.pdf import build_run_pdf
+    data = build_run_pdf(run_detail_from_row(run), lang=lang)
+    return Response(
+        content=data, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="answer-{run_id[:8]}.pdf"'},
+    )
 
 
 @router.get("/runs/{run_id}/export")
-def export_run(run_id: str, format: str = "xlsx", session: Session = Depends(get_session)) -> Response:
+def export_run(run_id: str, request: Request, format: str = "xlsx",
+               session: Session = Depends(get_session)) -> Response:
     """Full-result export — re-runs the audited SQL verbatim (spec/capabilities/export-results.md)."""
     if format not in ("xlsx", "csv"):
         raise api_error("BAD_FORMAT", "format must be xlsx or csv", 400)
-    run = session.get(RunRow, run_id)
-    if run is None:
-        raise api_error("NOT_FOUND", f"Run {run_id} not found", 404)
+    run = _guarded_run(run_id, request, session)
     if not run.sql_text or run.status != "completed":
         raise api_error("NOT_EXPORTABLE", "This run has no executed query to export.", 409)
 

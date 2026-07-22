@@ -30,6 +30,26 @@ class Settings(BaseSettings):
     llm_result_rows: int = Field(default=50)     # rows serialized into LLM prompts
     history_turns: int = Field(default=10)
 
+    # Phase 3 — MsSQL source (read-only) + nightly sync window (server local time)
+    mssql_host: str = Field(default="")
+    mssql_port: int = Field(default=1433)
+    mssql_database: str = Field(default="")
+    mssql_username: str = Field(default="")
+    mssql_password: str = Field(default="")
+    sync_hour: int = Field(default=2)            # 02:00 local — off-peak
+    sync_batch_rows: int = Field(default=50_000)
+
+    # Phase 4 — SMTP delivery + cost estimates (₹ per 1M tokens; label as estimates)
+    smtp_host: str = Field(default="")
+    smtp_port: int = Field(default=587)
+    smtp_username: str = Field(default="")
+    smtp_password: str = Field(default="")
+    smtp_from: str = Field(default="")
+    smtp_tls: bool = Field(default=True)
+    price_input_per_m: float = Field(default=26.0)
+    price_output_per_m: float = Field(default=105.0)
+    session_hours: int = Field(default=12)
+
     @property
     def resolved_llm_provider(self) -> str:
         """Provider name with dirty .env values tolerated (inline comments, whitespace)."""

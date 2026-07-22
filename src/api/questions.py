@@ -2,7 +2,7 @@ import json
 import queue
 import threading
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from api._common import ok
@@ -17,21 +17,22 @@ _SENTINEL = object()
 
 
 @router.post("/questions")
-def ask(req: QuestionRequest) -> dict:
-    detail = run_question(req.question, req.conversation_id)
+def ask(req: QuestionRequest, request: Request) -> dict:
+    detail = run_question(req.question, req.conversation_id, user=getattr(request.state, "user", None))
     return ok(detail)
 
 
 @router.post("/questions/stream")
-def ask_stream(req: QuestionRequest) -> StreamingResponse:
+def ask_stream(req: QuestionRequest, request: Request) -> StreamingResponse:
     events: queue.Queue = queue.Queue()
+    user = getattr(request.state, "user", None)
 
     def on_event(event: dict) -> None:
         events.put(event)
 
     def work() -> None:
         try:
-            run_question(req.question, req.conversation_id, on_event=on_event)
+            run_question(req.question, req.conversation_id, on_event=on_event, user=user)
         except Exception as exc:  # surfaced as SSE error, never a broken stream
             log.error("stream.run_crashed", error=str(exc))
             events.put({"type": "error", "message": f"The run crashed unexpectedly: {exc}"})

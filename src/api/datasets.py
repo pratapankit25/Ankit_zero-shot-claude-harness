@@ -1,7 +1,7 @@
 import json
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from api._common import api_error, ok
@@ -31,6 +31,8 @@ def _to_out(row: DatasetRow) -> dict:
         size_bytes=row.size_bytes,
         columns=json.loads(row.columns_json or "[]"),
         profile=json.loads(row.profile_json or "null"),
+        district=row.district,
+        synced_at=row.synced_at.isoformat() if row.synced_at else None,
         created_at=row.created_at.isoformat() if row.created_at else None,
     ).model_dump()
 
@@ -48,7 +50,10 @@ def _error_row(display: str, filename: str, message: str, size: int) -> DatasetR
 
 
 @router.post("/datasets")
-async def upload_datasets(files: list[UploadFile], session: Session = Depends(get_session)) -> dict:
+async def upload_datasets(files: list[UploadFile], request: Request,
+                          session: Session = Depends(get_session)) -> dict:
+    from api.auth import require_role
+    require_role(request, "admin", "analyst")
     if not files:
         raise api_error("NO_FILES", "Attach at least one CSV file.", 400)
     s = get_settings()
@@ -85,8 +90,11 @@ async def upload_datasets(files: list[UploadFile], session: Session = Depends(ge
 
 
 @router.post("/datasets/derived")
-def save_derived(req: DerivedDatasetRequest, session: Session = Depends(get_session)) -> dict:
+def save_derived(req: DerivedDatasetRequest, request: Request,
+                 session: Session = Depends(get_session)) -> dict:
     """Save a run's full result as a reusable dataset (spec/capabilities/derived-datasets.md)."""
+    from api.auth import require_role
+    require_role(request, "admin", "analyst")
     run = session.get(RunRow, req.run_id)
     if run is None:
         raise api_error("NOT_FOUND", f"Run {req.run_id} not found", 404)
@@ -124,10 +132,13 @@ def set_column_description(
     dataset_id: str,
     column_name: str,
     patch: ColumnDescriptionPatch,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> dict:
     """Data dictionary: annotate a column; the agent reads these in every prompt
     (spec/capabilities/data-dictionary.md)."""
+    from api.auth import require_role
+    require_role(request, "admin", "analyst")
     row = session.get(DatasetRow, dataset_id)
     if row is None:
         raise api_error("NOT_FOUND", f"Dataset {dataset_id} not found", 404)
@@ -142,13 +153,18 @@ def set_column_description(
 
 
 @router.get("/datasets")
-def list_datasets(session: Session = Depends(get_session)) -> dict:
+def list_datasets(request: Request, session: Session = Depends(get_session)) -> dict:
     rows = session.query(DatasetRow).order_by(DatasetRow.created_at.desc()).all()
+    user = getattr(request.state, "user", None)
+    if user is not None and user["role"] == "viewer" and user.get("district"):
+        rows = [r for r in rows if r.district is None or r.district == user["district"]]
     return ok([_to_out(r) for r in rows])
 
 
 @router.delete("/datasets/{dataset_id}")
-def delete_dataset(dataset_id: str, session: Session = Depends(get_session)) -> dict:
+def delete_dataset(dataset_id: str, request: Request, session: Session = Depends(get_session)) -> dict:
+    from api.auth import require_role
+    require_role(request, "admin", "analyst")
     row = session.get(DatasetRow, dataset_id)
     if row is None:
         raise api_error("NOT_FOUND", f"Dataset {dataset_id} not found", 404)

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api._common import api_error, ok
@@ -11,13 +11,17 @@ router = APIRouter()
 
 
 @router.get("/conversations")
-def list_conversations(session: Session = Depends(get_session)) -> dict:
+def list_conversations(request: Request, session: Session = Depends(get_session)) -> dict:
     counts = dict(
         session.query(RunRow.conversation_id, func.count(RunRow.id))
         .group_by(RunRow.conversation_id)
         .all()
     )
-    rows = session.query(ConversationRow).order_by(ConversationRow.updated_at.desc()).limit(100).all()
+    q = session.query(ConversationRow)
+    user = getattr(request.state, "user", None)
+    if user is not None and user["role"] != "admin":
+        q = q.filter(or_(ConversationRow.user_id == user["id"], ConversationRow.user_id.is_(None)))
+    rows = q.order_by(ConversationRow.updated_at.desc()).limit(100).all()
     return ok([
         {
             "id": r.id,

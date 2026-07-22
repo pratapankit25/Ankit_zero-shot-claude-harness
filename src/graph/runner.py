@@ -11,14 +11,14 @@ from graph.state import AgentState
 from graph.stream import register, unregister, emit
 
 
-def _ensure_conversation(question: str, conversation_id: str | None) -> str:
+def _ensure_conversation(question: str, conversation_id: str | None, user_id: str | None) -> str:
     with create_db_session() as session:
         if conversation_id:
             conv = session.get(ConversationRow, conversation_id)
             if conv is not None:
                 return conv.id
         title = question.strip()[:80] or "New conversation"
-        conv = ConversationRow(title=title)
+        conv = ConversationRow(title=title, user_id=user_id)
         session.add(conv)
         session.flush()
         return conv.id
@@ -42,6 +42,7 @@ def run_detail_from_row(run: RunRow) -> dict:
         "usage": {"input_tokens": run.input_tokens or 0, "output_tokens": run.output_tokens or 0},
         "duration_ms": run.duration_ms,
         "error": run.error_message,
+        "freshness": run.freshness,
         "created_at": run.created_at.isoformat() if run.created_at else None,
     }
 
@@ -50,12 +51,14 @@ def run_question(
     question: str,
     conversation_id: str | None = None,
     on_event: Callable[[dict], None] | None = None,
+    user: dict | None = None,
 ) -> dict:
     init_db()
-    conv_id = _ensure_conversation(question, conversation_id)
+    user_id = (user or {}).get("id")
+    conv_id = _ensure_conversation(question, conversation_id, user_id)
 
     with create_db_session() as session:
-        run = RunRow(status="pending", input_text=question, conversation_id=conv_id)
+        run = RunRow(status="pending", input_text=question, conversation_id=conv_id, user_id=user_id)
         session.add(run)
         session.flush()
         run_id = run.id
@@ -72,6 +75,10 @@ def run_question(
             "question": question,
             "error": None,
         }
+        if user_id:
+            initial["user_id"] = user_id
+        if user and user.get("role") == "viewer" and user.get("district"):
+            initial["user_district"] = user["district"]
         agentic_ai.invoke(initial)
     finally:
         duration_ms = round((time.monotonic() - started) * 1000)

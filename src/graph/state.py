@@ -5,6 +5,8 @@ class AgentState(TypedDict, total=False):
     # Identity
     run_id: str
     conversation_id: str
+    user_id: str             # phase 4: attribution
+    user_district: str       # phase 4: set only for district-scoped viewers
 
     # Input
     question: str

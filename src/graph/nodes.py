@@ -105,6 +105,7 @@ def prepare_context(state: AgentState) -> AgentState:
                 .order_by(DatasetRow.created_at.desc())
                 .all()
             )
+            allowed_district = state.get("user_district")  # set for district-scoped viewers
             datasets = [
                 {
                     "id": r.id,
@@ -112,8 +113,13 @@ def prepare_context(state: AgentState) -> AgentState:
                     "table_name": r.table_name,
                     "row_count": r.row_count,
                     "columns": json.loads(r.columns_json or "[]"),
+                    "source": r.source,
+                    "district": r.district,
+                    "synced_at": r.synced_at.isoformat() if r.synced_at else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
                 }
                 for r in ds_rows
+                if allowed_district is None or r.district is None or r.district == allowed_district
             ]
             history: list = []
             conv_id = state.get("conversation_id")
@@ -231,7 +237,8 @@ def execute_sql(state: AgentState) -> AgentState:
     emit_step(state, "Running the query on your data", "आपके डेटा पर क्वेरी चला रहा हूँ", "start")
     start = time.monotonic()
     try:
-        result = store.run_select(sql)
+        allowed = [d["table_name"] for d in state.get("datasets", [])] if state.get("user_district") else None
+        result = store.run_select(sql, allowed_tables=allowed)
         duration = round((time.monotonic() - start) * 1000)
         attempts.append({"sql": sql, "row_count": result["row_count"], "duration_ms": duration})
         state["steps"][-1]["status"] = "done"
@@ -343,6 +350,24 @@ def _split_answer(text: str) -> tuple[str, list, list]:
     return body.strip(), caveats, followups
 
 
+def _freshness_line(state: AgentState) -> str | None:
+    """Oldest freshness among the datasets this answer used (spec/capabilities/data-freshness.md)."""
+    used_ids = (state.get("plan") or {}).get("dataset_ids") or []
+    used = [d for d in state.get("datasets", []) if d["id"] in used_ids]
+    if not used:
+        return None
+    stamps = []
+    for d in used:
+        if d.get("source") == "mssql" and d.get("synced_at"):
+            stamps.append((d["synced_at"], f"synced {d['synced_at'][:16].replace('T', ' ')}"))
+        elif d.get("created_at"):
+            stamps.append((d["created_at"], f"uploaded {d['created_at'][:16].replace('T', ' ')}"))
+    if not stamps:
+        return None
+    oldest = min(stamps, key=lambda x: x[0])
+    return f"Data as of: {oldest[1]} (UTC)"
+
+
 def _persist(state: AgentState, status: str) -> None:
     with create_db_session() as session:
         run = session.get(RunRow, state["run_id"])
@@ -361,6 +386,8 @@ def _persist(state: AgentState, status: str) -> None:
         run.followups_json = json.dumps(state.get("followups", []), ensure_ascii=False)
         run.chart_json = json.dumps(state.get("chart"), ensure_ascii=False, default=str)
         run.flags_json = json.dumps(state.get("flags", []), ensure_ascii=False)
+        run.freshness = _freshness_line(state)
+        run.user_id = state.get("user_id")
         usage = state.get("usage", {})
         run.input_tokens = usage.get("input_tokens", 0)
         run.output_tokens = usage.get("output_tokens", 0)
