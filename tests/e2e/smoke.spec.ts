@@ -19,11 +19,20 @@ test('workspace loads, styled, with empty states', async ({ page }) => {
   await page.goto('/app/')
   await expect(page.getByRole('heading', { name: 'UP Police Data Analyst' })).toBeVisible()
 
-  // styled-render gate: the sidebar must actually be styled (white bg, fixed width)
+  // styled-render gate: the sidebar must actually be styled (navy command-center
+  // theme per spec/ui.md Visual Identity) — an unstyled page has a transparent aside
   const aside = page.locator('aside')
   await expect(aside).toBeVisible()
-  const bg = await aside.evaluate(el => getComputedStyle(el).backgroundColor)
-  expect(bg).toBe('rgb(255, 255, 255)')
+  // resolve the computed color to rgb via canvas so the assertion survives
+  // Tailwind emitting oklch(); unstyled = transparent, which fails both checks
+  const [r, g, b, a] = await aside.evaluate(el => {
+    const ctx = document.createElement('canvas').getContext('2d')!
+    ctx.fillStyle = getComputedStyle(el).backgroundColor
+    ctx.fillRect(0, 0, 1, 1)
+    return Array.from(ctx.getImageData(0, 0, 1, 1).data)
+  })
+  expect(a).toBe(255)                     // painted, not transparent
+  expect(r + g + b).toBeLessThan(150)     // dark navy per spec/ui.md Visual Identity
 
   // designed empty states, not blank panels
   await expect(page.getByText('No datasets yet')).toBeVisible()

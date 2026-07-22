@@ -5,15 +5,15 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ConversationSummary, Dataset, RunDetail, Step } from './types'
 
-const COMING_SOON: { label: string; phase: string }[] = [
-  { label: 'Charts & graphs', phase: 'Phase 2' },
-  { label: 'Excel / PDF export', phase: 'Phase 2' },
-  { label: 'Saved datasets', phase: 'Phase 2' },
-  { label: 'Data dictionary', phase: 'Phase 2' },
-  { label: 'MsSQL nightly sync', phase: 'Phase 3' },
-  { label: 'Scheduled summaries', phase: 'Phase 3' },
-  { label: 'Login & district roles', phase: 'Phase 4' },
-  { label: 'Cost dashboard', phase: 'Phase 4' },
+const COMING_SOON: { label: string; phase: string; tone: string }[] = [
+  { label: 'Charts & graphs', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
+  { label: 'Excel / PDF export', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
+  { label: 'Saved datasets', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
+  { label: 'Data dictionary', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
+  { label: 'MsSQL nightly sync', phase: 'Phase 3', tone: 'text-violet-300/70 border-violet-800' },
+  { label: 'Scheduled summaries', phase: 'Phase 3', tone: 'text-violet-300/70 border-violet-800' },
+  { label: 'Login & district roles', phase: 'Phase 4', tone: 'text-amber-300/70 border-amber-800' },
+  { label: 'Cost dashboard', phase: 'Phase 4', tone: 'text-amber-300/70 border-amber-800' },
 ]
 
 interface Turn extends Partial<RunDetail> {
@@ -21,6 +21,28 @@ interface Turn extends Partial<RunDetail> {
   live?: boolean
   liveSteps?: Step[]
   liveAnswer?: string
+}
+
+function Shield() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-10 w-10 shrink-0" aria-hidden="true">
+      <defs>
+        <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f59e0b" />
+          <stop offset="1" stopColor="#b45309" />
+        </linearGradient>
+      </defs>
+      <path d="M24 3l16 6v12c0 10.5-6.8 19.3-16 24C14.8 40.3 8 31.5 8 21V9l16-6z" fill="url(#sg)" />
+      <path d="M24 7.2l12 4.5v9.6c0 8.3-5.2 15.4-12 19.4-6.8-4-12-11.1-12-19.4v-9.6l12-4.5z" fill="#0f172a" />
+      <path d="M24 12l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6-4.5-4.2 6.1-.8L24 12z" fill="#f59e0b" />
+    </svg>
+  )
+}
+
+function StatusDot({ status }: { status: string }) {
+  if (status === 'done') return <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">✓</span>
+  if (status === 'error') return <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-rose-500 text-[9px] font-bold text-white">✕</span>
+  return <span className="relative grid h-4 w-4 shrink-0 place-items-center"><span className="absolute h-4 w-4 animate-ping rounded-full bg-amber-400/60 motion-reduce:hidden" /><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /></span>
 }
 
 export default function Home() {
@@ -34,6 +56,7 @@ export default function Home() {
   const [elapsed, setElapsed] = useState(0)
   const [banner, setBanner] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -95,6 +118,12 @@ export default function Home() {
     setConfirmDelete(null)
     await fetch(`/datasets/${id}`, { method: 'DELETE' })
     await refreshDatasets()
+  }
+
+  function copySql(sql: string, runId: string) {
+    navigator.clipboard.writeText(sql)
+    setCopied(runId)
+    setTimeout(() => setCopied(null), 1500)
   }
 
   async function ask(question: string) {
@@ -167,78 +196,88 @@ export default function Home() {
   const libraryEmpty = datasets !== null && datasets.length === 0
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-slate-100">
       {/* ---------------------------- sidebar ---------------------------- */}
-      <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-4">
-          <h1 className="text-base font-bold leading-tight">UP Police Data Analyst</h1>
-          <p className="text-xs text-slate-500">डेटा से पूछिए — English या हिंदी में</p>
+      <aside className="flex w-[21rem] shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200 shadow-2xl">
+        <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+          <Shield />
+          <div>
+            <h1 className="text-[15px] font-bold leading-tight tracking-wide text-white">UP Police Data Analyst</h1>
+            <p className="text-[11px] text-amber-400/90">डेटा से पूछिए — English या हिंदी में</p>
+          </div>
         </div>
 
-        <section className="px-4 py-3" data-testid="datasets-panel">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Datasets</h2>
+        <section className="px-4 py-4" data-testid="datasets-panel">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Datasets</h2>
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-lg bg-gradient-to-b from-amber-400 to-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md shadow-amber-900/30 transition hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-50"
             >
-              {uploading ? 'Uploading…' : 'Upload CSVs'}
+              {uploading ? 'Uploading…' : '⬆ Upload CSVs'}
             </button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" multiple hidden data-testid="file-input"
               onChange={e => handleUpload(e.target.files)} />
           </div>
 
-          {datasets === null && <div className="h-16 animate-pulse rounded-lg bg-slate-100" />}
+          {datasets === null && <div className="h-16 animate-pulse rounded-xl bg-white/5" />}
           {libraryEmpty && (
-            <p className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500">
+            <p className="rounded-xl border border-dashed border-slate-600 bg-white/5 p-3 text-xs leading-relaxed text-slate-400">
               No datasets yet. Upload one or more CSV exports (FIRs, Dial-112, personnel…) to begin.
             </p>
           )}
           <ul className="space-y-2">
             {datasets?.map(d => (
-              <li key={d.id} className={`rounded-lg border p-2.5 text-sm ${d.status === 'error' ? 'border-red-200 bg-red-50' : 'border-slate-200'}`} data-testid="dataset-card">
+              <li key={d.id} className={`group rounded-xl border p-3 text-sm transition ${d.status === 'error' ? 'border-rose-800 bg-rose-950/40' : 'border-white/10 bg-white/5 hover:border-amber-500/40 hover:bg-white/10'}`} data-testid="dataset-card">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium" title={d.original_filename}>{d.name}</p>
-                    {d.status === 'ready' ? (
-                      <p className="text-xs text-slate-500">{d.row_count?.toLocaleString('en-IN')} rows × {d.columns.length} cols · <span className="rounded bg-slate-100 px-1">{d.source.toUpperCase()}</span></p>
-                    ) : (
-                      <p className="text-xs text-red-600">{d.error_message}</p>
-                    )}
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm ${d.status === 'error' ? 'bg-rose-900/60' : 'bg-slate-800 text-amber-400'}`}>
+                      {d.status === 'error' ? '⚠' : '▦'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-white" title={d.original_filename}>{d.name}</p>
+                      {d.status === 'ready' ? (
+                        <p className="text-[11px] tabular-nums text-slate-400">{d.row_count?.toLocaleString('en-IN')} rows × {d.columns.length} cols · <span className="rounded bg-slate-800 px-1 py-px text-[10px] tracking-wide text-slate-300">{d.source.toUpperCase()}</span></p>
+                      ) : (
+                        <p className="text-[11px] leading-snug text-rose-300">{d.error_message}</p>
+                      )}
+                    </div>
                   </div>
                   {confirmDelete === d.id ? (
                     <span className="flex shrink-0 gap-1">
-                      <button onClick={() => deleteDataset(d.id)} className="rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-red-700">Delete</button>
-                      <button onClick={() => setConfirmDelete(null)} className="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] hover:bg-slate-50">Keep</button>
+                      <button onClick={() => deleteDataset(d.id)} className="rounded-md bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-rose-500">Delete</button>
+                      <button onClick={() => setConfirmDelete(null)} className="rounded-md border border-slate-600 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-white/10">Keep</button>
                     </span>
                   ) : (
                     <button onClick={() => setConfirmDelete(d.id)} aria-label={`Delete ${d.name}`}
-                      className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-red-600">✕</button>
+                      className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] text-slate-500 opacity-0 transition focus:opacity-100 group-hover:opacity-100 hover:bg-rose-900/50 hover:text-rose-300">✕</button>
                   )}
                 </div>
                 {confirmDelete === d.id && (
-                  <p className="mt-1.5 text-[11px] text-red-700">Removes “{d.name}” and its data. Past answers stay in the audit log.</p>
+                  <p className="mt-2 text-[11px] leading-snug text-rose-300">Removes “{d.name}” and its data. Past answers stay in the audit log.</p>
                 )}
                 {d.status === 'ready' && (
-                  <details className="mt-1.5">
-                    <summary className="cursor-pointer text-xs text-blue-700 hover:underline">Profile</summary>
-                    <div className="mt-1.5 space-y-1 text-xs">
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs font-medium text-amber-400/90 hover:text-amber-300">Profile</summary>
+                    <div className="mt-2 space-y-1.5 text-xs">
                       {(d.profile?.warnings ?? []).map((w, i) => (
-                        <p key={i} className="rounded bg-amber-50 px-1.5 py-1 text-amber-800">⚠ {w}</p>
+                        <p key={i} className="rounded-lg bg-amber-950/60 px-2 py-1 text-[11px] leading-snug text-amber-300">⚠ {w}</p>
                       ))}
-                      <table className="w-full text-[11px]">
-                        <tbody>
-                          {d.columns.slice(0, 30).map(c => (
-                            <tr key={c.name} className="border-t border-slate-100 align-top">
-                              <td className="py-1 pr-2 font-mono">{c.name}</td>
-                              <td className="py-1 pr-2 text-slate-500">{c.type}</td>
-                              <td className="py-1 text-slate-400">{c.top_values.slice(0, 3).join(', ')}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {d.columns.length > 30 && <p className="text-slate-400">… and {d.columns.length - 30} more columns</p>}
+                      <div className="overflow-hidden rounded-lg border border-white/10">
+                        <table className="w-full text-[11px]">
+                          <tbody>
+                            {d.columns.slice(0, 30).map((c, ci) => (
+                              <tr key={c.name} className={`align-top ${ci % 2 ? 'bg-white/5' : ''}`}>
+                                <td className="py-1 pl-2 pr-2 font-mono text-slate-200">{c.name}</td>
+                                <td className="py-1 pr-2"><span className={`rounded px-1 py-px text-[10px] ${c.type === 'integer' || c.type === 'real' ? 'bg-sky-900/70 text-sky-300' : c.type === 'date' ? 'bg-violet-900/70 text-violet-300' : 'bg-slate-800 text-slate-400'}`}>{c.type}</span></td>
+                                <td className="py-1 pr-2 text-slate-500">{c.top_values.slice(0, 3).join(', ')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {d.columns.length > 30 && <p className="text-slate-500">… and {d.columns.length - 30} more columns</p>}
                     </div>
                   </details>
                 )}
@@ -247,17 +286,17 @@ export default function Home() {
           </ul>
         </section>
 
-        <section className="border-t border-slate-200 px-4 py-3">
+        <section className="border-t border-white/10 px-4 py-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Conversations</h2>
-            <button onClick={newConversation} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-50">New</button>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Conversations</h2>
+            <button onClick={newConversation} className="rounded-lg border border-slate-600 px-2.5 py-1 text-xs font-medium text-slate-200 transition hover:border-amber-500/60 hover:text-amber-300">+ New</button>
           </div>
-          {conversations.length === 0 && <p className="text-xs text-slate-400">Questions you ask will appear here.</p>}
+          {conversations.length === 0 && <p className="text-xs text-slate-500">Questions you ask will appear here.</p>}
           <ul className="space-y-1">
             {conversations.slice(0, 15).map(c => (
               <li key={c.id}>
                 <button onClick={() => openConversation(c.id)}
-                  className={`w-full truncate rounded-md px-2 py-1.5 text-left text-xs hover:bg-slate-100 ${c.id === conversationId ? 'bg-slate-100 font-medium' : ''}`}>
+                  className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition ${c.id === conversationId ? 'bg-amber-500/15 font-medium text-amber-300' : 'text-slate-300 hover:bg-white/10'}`}>
                   {c.title}
                 </button>
               </li>
@@ -265,14 +304,14 @@ export default function Home() {
           </ul>
         </section>
 
-        <section className="mt-auto border-t border-slate-200 px-4 py-3" data-testid="coming-soon">
-          <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming soon</h2>
-          <p className="mb-2 text-[11px] text-slate-400">Planned — not built yet.</p>
+        <section className="mt-auto border-t border-white/10 px-4 py-4" data-testid="coming-soon">
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Coming soon</h2>
+          <p className="mb-2.5 text-[11px] text-slate-500">Planned — not built yet.</p>
           <div className="flex flex-wrap gap-1.5">
             {COMING_SOON.map(s => (
               <span key={s.label} title="Planned — not built yet"
-                className="cursor-not-allowed select-none rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-400">
-                {s.label} · {s.phase}
+                className={`cursor-not-allowed select-none rounded-full border border-dashed px-2.5 py-1 text-[11px] ${s.tone}`}>
+                🔒 {s.label} · {s.phase}
               </span>
             ))}
           </div>
@@ -281,43 +320,64 @@ export default function Home() {
 
       {/* ---------------------------- chat pane ---------------------------- */}
       <main className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-3 backdrop-blur">
+          <p className="truncate text-sm font-semibold text-slate-700">
+            {conversationId ? (conversations.find(c => c.id === conversationId)?.title ?? 'Conversation') : 'New conversation'}
+          </p>
+          <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Phase 1 · live
+          </span>
+        </div>
+
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {turns.length === 0 && (
-            <div className="mx-auto mt-24 max-w-md text-center text-sm text-slate-500">
-              <p className="mb-2 text-3xl">🗂️ → ❓ → 📊</p>
-              <p className="font-medium text-slate-700">Two steps:</p>
-              <p className="mt-1">1. Upload CSVs from the left panel.<br />2. Ask a question below — English या हिंदी, जैसे “2025 में सबसे ज़्यादा FIR किस जिले में?”</p>
+            <div className="mx-auto mt-20 max-w-lg text-center">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-3xl bg-slate-900 shadow-xl"><Shield /></div>
+              <p className="text-lg font-bold text-slate-800">Two steps:</p>
+              <div className="mx-auto mt-4 grid max-w-md grid-cols-1 gap-3 text-left sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xl">🗂️</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">1 · Upload CSVs</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">FIRs, Dial-112, personnel — from the left panel.</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xl">💬</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">2 · Ask anything</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">English या हिंदी — जैसे “2025 में सबसे ज़्यादा FIR किस जिले में?”</p>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="mx-auto max-w-3xl space-y-6">
+          <div className="mx-auto max-w-3xl space-y-7">
             {turns.map((t, i) => (
-              <div key={i} data-testid="turn">
-                <div className="mb-2 flex justify-end">
-                  <p className="max-w-[80%] rounded-2xl rounded-br-sm bg-blue-600 px-4 py-2 text-sm text-white">{t.question}</p>
+              <div key={i} data-testid="turn" className="animate-rise">
+                <div className="mb-2.5 flex justify-end">
+                  <p className="max-w-[80%] rounded-2xl rounded-br-md bg-gradient-to-br from-slate-800 to-slate-900 px-4 py-2.5 text-sm leading-relaxed text-white shadow-md">{t.question}</p>
                 </div>
 
-                <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+                <div className="max-w-[94%] rounded-2xl rounded-bl-md border border-slate-200 border-l-4 border-l-amber-500 bg-white px-5 py-4 text-sm shadow-md shadow-slate-200/60">
                   {t.live && (
-                    <div className="mb-2 space-y-1" data-testid="step-ticker">
+                    <div className="mb-3 space-y-2" data-testid="step-ticker">
                       {(t.liveSteps ?? []).map((s, j) => (
-                        <p key={j} className="text-xs text-slate-500">
-                          {s.status === 'done' ? '✓' : s.status === 'error' ? '✕' : <span className="inline-block animate-pulse">●</span>}{' '}
-                          {s.label_en} <span className="text-slate-400">/ {s.label_hi}</span>
+                        <p key={j} className="flex items-center gap-2.5 text-xs text-slate-600">
+                          <StatusDot status={s.status} />
+                          <span className="font-medium">{s.label_en}</span>
+                          <span className="text-slate-400">/ {s.label_hi}</span>
                         </p>
                       ))}
-                      {elapsed >= 3 && <p className="text-[11px] text-slate-400">{elapsed}s elapsed…</p>}
+                      {elapsed >= 3 && <p className="pl-6 text-[11px] tabular-nums text-slate-400">{elapsed}s elapsed…</p>}
                     </div>
                   )}
 
                   {t.status === 'failed' ? (
                     <div className="text-sm">
-                      <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{t.error ?? 'Something went wrong.'}</p>
+                      <p className="mb-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 leading-relaxed text-rose-700">{t.error ?? 'Something went wrong.'}</p>
                       <button onClick={() => ask(t.question)} disabled={running}
-                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50">↻ Retry</button>
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-amber-500 hover:text-amber-700 disabled:opacity-50">↻ Retry</button>
                     </div>
                   ) : (
-                    <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-table:my-2" data-testid="answer">
+                    <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-table:my-2 prose-strong:text-slate-900" data-testid="answer">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {(t.live ? t.liveAnswer : t.answer) || (t.live ? '' : '_No answer._')}
                       </ReactMarkdown>
@@ -325,54 +385,62 @@ export default function Home() {
                   )}
 
                   {t.status === 'clarification' && !t.live && (
-                    <p className="mt-1.5 text-[11px] text-slate-400">Answering helps me get this right — reply below.</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Answering helps me get this right — reply below.</p>
                   )}
 
                   {!t.live && t.status === 'completed' && (
                     <>
                       {t.result && t.result.rows.length > 0 && (
-                        <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-slate-200" data-testid="result-table">
+                        <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-slate-200 shadow-sm" data-testid="result-table">
                           <table className="w-full text-xs">
-                            <thead className="sticky top-0 bg-slate-50">
-                              <tr>{t.result.columns.map(c => <th key={c} className="px-2 py-1.5 text-left font-semibold">{c}</th>)}</tr>
+                            <thead className="sticky top-0">
+                              <tr className="bg-slate-900 text-left text-white">
+                                {t.result.columns.map(c => <th key={c} className="px-3 py-2 font-semibold">{c}</th>)}
+                              </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="tabular-nums">
                               {t.result.rows.map((row, ri) => (
-                                <tr key={ri} className="border-t border-slate-100">
-                                  {row.map((cell, ci) => <td key={ci} className="px-2 py-1">{cell === null ? '—' : String(cell)}</td>)}
+                                <tr key={ri} className={ri % 2 ? 'bg-slate-50' : 'bg-white'}>
+                                  {row.map((cell, ci) => <td key={ci} className="px-3 py-1.5 text-slate-700">{cell === null ? '—' : String(cell)}</td>)}
                                 </tr>
                               ))}
                             </tbody>
                           </table>
-                          {t.result.truncated && <p className="bg-slate-50 px-2 py-1 text-[11px] text-slate-500">Showing the first {t.result.rows.length} rows.</p>}
+                          {t.result.truncated && <p className="bg-slate-100 px-3 py-1.5 text-[11px] text-slate-500">Showing the first {t.result.rows.length} rows.</p>}
                         </div>
                       )}
 
-                      <div className="mt-2 space-y-1">
+                      <div className="mt-3 space-y-1.5">
                         {t.sql && (
-                          <details data-testid="sql-disclosure">
-                            <summary className="cursor-pointer text-xs font-medium text-blue-700 hover:underline">SQL</summary>
-                            <div className="relative mt-1">
-                              <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-100">{t.sql}</pre>
-                              <button onClick={() => navigator.clipboard.writeText(t.sql!)}
-                                className="absolute right-2 top-2 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-200 hover:bg-slate-600">Copy</button>
+                          <details data-testid="sql-disclosure" className="group/sql">
+                            <summary className="cursor-pointer text-xs font-semibold text-amber-700 hover:text-amber-600">SQL</summary>
+                            <div className="mt-1.5 overflow-hidden rounded-xl shadow-md">
+                              <div className="flex items-center justify-between bg-slate-800 px-3 py-1.5">
+                                <span className="flex gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-rose-400" /><i className="h-2.5 w-2.5 rounded-full bg-amber-400" /><i className="h-2.5 w-2.5 rounded-full bg-emerald-400" /></span>
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400">query it ran</span>
+                                <button onClick={() => copySql(t.sql!, t.run_id ?? String(i))}
+                                  className="rounded-md bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-200 transition hover:bg-slate-600">
+                                  {copied === (t.run_id ?? String(i)) ? '✓ Copied' : 'Copy'}
+                                </button>
+                              </div>
+                              <pre className="overflow-x-auto bg-slate-950 p-3.5 text-[11px] leading-relaxed text-emerald-200">{t.sql}</pre>
                             </div>
                           </details>
                         )}
                         {(t.steps?.length ?? 0) > 0 && (
                           <details>
-                            <summary className="cursor-pointer text-xs font-medium text-blue-700 hover:underline">Steps</summary>
-                            <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+                            <summary className="cursor-pointer text-xs font-semibold text-amber-700 hover:text-amber-600">Steps</summary>
+                            <ul className="mt-1.5 space-y-1 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
                               {t.steps!.map((s, j) => (
-                                <li key={j}>{s.status === 'error' ? '✕' : '✓'} {s.label_en}{s.detail ? <span className="text-slate-400"> — {s.detail}</span> : null}</li>
+                                <li key={j} className="flex gap-2"><StatusDot status={s.status === 'error' ? 'error' : 'done'} /><span>{s.label_en}{s.detail ? <span className="text-slate-400"> — {s.detail}</span> : null}</span></li>
                               ))}
                             </ul>
                           </details>
                         )}
                         {(t.caveats?.length ?? 0) > 0 && (
                           <details>
-                            <summary className="cursor-pointer text-xs font-medium text-blue-700 hover:underline">Caveats & assumptions</summary>
-                            <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
+                            <summary className="cursor-pointer text-xs font-semibold text-amber-700 hover:text-amber-600">Caveats & assumptions</summary>
+                            <ul className="mt-1.5 list-inside list-disc rounded-xl bg-amber-50/70 p-3 text-xs leading-relaxed text-amber-900">
                               {t.caveats!.map((c, j) => <li key={j}>{c}</li>)}
                             </ul>
                           </details>
@@ -380,10 +448,10 @@ export default function Home() {
                       </div>
 
                       {(t.followups?.length ?? 0) > 0 && (
-                        <div className="mt-2.5 flex flex-wrap gap-1.5" data-testid="followups">
+                        <div className="mt-3.5 flex flex-wrap gap-2" data-testid="followups">
                           {t.followups!.map((f, j) => (
                             <button key={j} onClick={() => ask(f)} disabled={running}
-                              className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+                              className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm transition hover:-translate-y-px hover:bg-amber-100 hover:shadow motion-reduce:hover:translate-y-0 disabled:opacity-50">
                               {f}
                             </button>
                           ))}
@@ -399,14 +467,14 @@ export default function Home() {
         </div>
 
         {banner && (
-          <p className="mx-6 mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">{banner}</p>
+          <p className="mx-6 mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800">{banner}</p>
         )}
 
         <form
           onSubmit={e => { e.preventDefault(); ask(input) }}
           className="border-t border-slate-200 bg-white px-6 py-4"
         >
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
+          <div className="mx-auto flex max-w-3xl items-end gap-2.5">
             <textarea
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -415,11 +483,11 @@ export default function Home() {
               placeholder="Ask in English or हिंदी…  (Enter to send, Shift+Enter for a new line)"
               disabled={running}
               data-testid="composer"
-              className="flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50"
+              className="flex-1 resize-none rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm shadow-inner transition focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:bg-slate-100"
             />
             <button type="submit" disabled={running || !input.trim()} data-testid="ask-button"
-              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-              {running ? 'Working…' : 'Ask'}
+              className="rounded-2xl bg-gradient-to-b from-amber-400 to-amber-500 px-6 py-3 text-sm font-bold text-slate-900 shadow-lg shadow-amber-500/30 transition hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-50 disabled:shadow-none">
+              {running ? 'Working…' : 'Ask →'}
             </button>
           </div>
         </form>

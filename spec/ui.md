@@ -6,6 +6,10 @@
 
 Single-page web app (chat + library), served at `http://localhost:8001/app/`. Bilingual surface: UI chrome in English with Hindi step labels; user content in whatever language it was asked/answered in.
 
+## Visual Identity
+
+Command-center theme (user-requested at the Phase-1 gate): deep navy sidebar (slate-900, solid — the styled-render E2E asserts its computed color) carrying a shield emblem and the product name; khaki-gold amber as the single accent (primary buttons, follow-up chips, assistant-card accent border) echoing the force's colours; light content pane (slate-50) with white elevated cards, navy user bubbles, and a navy-headed zebra result table. Motion is subtle and respects `prefers-reduced-motion`: message fade-rise, pulsing dot on the active step. Numbers render with tabular figures. All interactive elements keep visible focus rings; test hooks (`data-testid`) are stable across restyles.
+
 ## Views / Screens
 
 ### Screen: Analyst Workspace (the single page)
