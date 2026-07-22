@@ -86,7 +86,7 @@ Step "Preparing the database"
 uv run alembic upgrade head
 if ($LASTEXITCODE -ne 0) { Fail "Database migration failed - see above." }
 $rev = (uv run alembic current) -join " "
-if ($rev -notmatch "0002") { Fail "Migration did not apply (alembic current: '$rev')." }
+if ($rev -notmatch "head") { Fail "Migration did not apply (alembic current: '$rev')." }
 Write-Host "  Database ready ($rev)"
 
 # ---------------------------------------------------------------- run
