@@ -2,7 +2,7 @@
 
 A bilingual (Hindi/English) data-analyst agent. Upload CSV exports — FIR records, Dial-112 logs, personnel data, ad-hoc MsSQL extracts — into a persistent library, then ask questions in plain language. The agent profiles every upload, writes and runs read-only SQL over the **full** data, checks its own results, and streams back answers with the SQL, its working steps, caveats, and suggested follow-ups. Officers act on these numbers, so every question is audited: question, SQL, result, timings, tokens.
 
-Built spec-first with the [zero-shot SDD harness](spec/roadmap.md) — the full spec lives in `spec/`. Phases 1–2 of 4 are complete; MsSQL nightly sync + scheduled summaries (3) and login/roles/cost dashboard (4) are next and appear in the UI as labelled "Coming soon" stubs.
+Built spec-first with the [zero-shot SDD harness](spec/roadmap.md) — the full spec lives in `spec/`. **All 4 phases are complete**: ask-your-data (1), charts/exports/saved datasets/dictionary (2), MsSQL nightly sync + freshness + scheduled briefs (3), and login/district roles + cost dashboard + bilingual PDFs + email (4).
 
 **Privacy line:** the LLM API receives dataset schemas, column profiles, and small computed aggregates (≤50 rows) — never raw data rows. The eventual MsSQL DB is reached only by off-peak extracts (Phase 3), never by daytime questions.
 
@@ -78,13 +78,17 @@ uv run alembic upgrade head && uv run pytest tests/ -v && npx playwright test te
 
 Real-LLM tests assert **exact pre-computed numbers** from `tests/fixtures/expected_answers.json` — regenerate fixtures with `uv run python tests/fixtures/generate.py`.
 
-*Authoring note:* this phase was built in a cloud sandbox that cannot reach the Gemini API; there, `AGENT_SKIP_LLM_TESTS=1` and `E2E_LLM=0` skip the real-LLM tests. **Do not set these when gating** — on your machine the gate above runs everything for real.
+*Authoring note:* this project was built in a cloud sandbox that cannot reach the Gemini API; there, `AGENT_SKIP_LLM_TESTS=1` and `E2E_LLM=0` skip the real-LLM tests. **Do not set these when gating** — on your machine the gate above runs everything for real.
 
-## What's real vs stubbed
+## What's included (all real, no stubs)
 
-Real end-to-end (Phases 1–2): multi-CSV upload (encoding/delimiter tolerant, Devanagari-safe, full load — never sampled), auto-profiling, EN/HI/Hinglish questions, LangGraph plan→SQL→execute→self-check→retry loop, cross-dataset joins, clarification on ambiguity, streamed answers + live step ticker, per-answer SQL/steps/caveats/follow-ups, **auto charts (line/bar) drawn from the executed result**, **anomaly "Data check" flags** (coverage gaps, high-null columns), **Excel/CSV export of the full result**, **save-result-as-dataset** (reusable in later questions and joins), **editable data dictionary** the agent reads on every question, persistent conversations with context, full audit trail (`GET /runs/{id}`), read-only SQL guardrails (authorizer, timeout, row caps).
+**Ask your data (P1):** multi-CSV upload (encoding/delimiter tolerant, Devanagari-safe, full load — never sampled), auto-profiling, EN/HI/Hinglish questions, LangGraph plan→SQL→execute→self-check→retry loop, cross-dataset joins, clarification on ambiguity, streamed answers + live step ticker, per-answer SQL/steps/caveats/follow-ups, persistent conversations with context, full audit trail, read-only SQL guardrails (authorizer, timeout, row caps).
 
-Labelled stubs (sidebar "Coming soon"): MsSQL nightly sync, scheduled summaries (Phase 3); login & district roles, cost dashboard (Phase 4).
+**Richer answers (P2):** auto charts (line/bar) drawn from the executed result, anomaly "Data check" flags, Excel/CSV export of the full result, save-result-as-dataset, editable data dictionary the agent reads on every question.
+
+**MsSQL, fresh & light (P3):** configure tables from your MsSQL server (sidebar → *MsSQL source*; read-only credentials in `.env`) — a nightly extract (default 02:00, `AGENT_SYNC_HOUR`) loads them into the local store via staging + atomic swap, with optional incremental columns; **daytime questions never touch MsSQL**. Freshness ("Data as of …") shows on every dataset and answer; stale syncs get a warning badge. *Scheduled briefs* run saved question-sets daily/weekly and store reports (late-run catch-up if the machine was off).
+
+**Many hands, safely (P4):** open access until you create the first admin (sidebar → *Administration*), then login is enforced — admin/analyst/viewer roles, district-tagged datasets (viewers see only their district; even hand-written SQL naming another district's table is blocked at the database layer), per-user conversations, admin cost dashboard (₹ estimates from `AGENT_PRICE_*`), bilingual (EN+Hindi) briefing PDFs with embedded Devanagari fonts on every answer and report, and email delivery of scheduled briefs via SMTP (3 retries, delivery log).
 
 ## Architecture (one paragraph)
 
