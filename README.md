@@ -26,7 +26,7 @@ cd frontend && pnpm install && pnpm build && cd ..
 pnpm install                      # root: Playwright for E2E tests
 npx playwright install chromium   # E2E browser (one-time download)
 uv run alembic upgrade head
-uv run alembic current            # must print "0002 (head)" — blank output means no migration ran
+uv run alembic current            # must print a revision ending in "(head)" — blank means no migration ran
 ```
 
 Windows (PowerShell) — one command per line (old PowerShell doesn't support `&&`):
@@ -42,7 +42,7 @@ cd ..
 pnpm install
 npx playwright install chromium
 uv run alembic upgrade head
-uv run alembic current            # must print "0002 (head)"
+uv run alembic current            # must print a revision ending in "(head)"
 ```
 
 Missing tools on Windows: uv → `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` · Node 20+ → nodejs.org · pnpm → `npm install -g pnpm`.
@@ -70,7 +70,7 @@ uv run pytest tests/ -v                     # + real-LLM integration gate (key i
 npx playwright test tests/e2e --reporter=line   # E2E against the running server (start it first)
 ```
 
-The Phase-1 gate (real LLM + full fixtures + E2E) is:
+The phase gate (real LLM + full fixtures + E2E) is:
 
 ```bash
 uv run alembic upgrade head && uv run pytest tests/ -v && npx playwright test tests/e2e --reporter=line
@@ -80,7 +80,7 @@ Real-LLM tests assert **exact pre-computed numbers** from `tests/fixtures/expect
 
 *Authoring note:* this phase was built in a cloud sandbox that cannot reach the Gemini API; there, `AGENT_SKIP_LLM_TESTS=1` and `E2E_LLM=0` skip the real-LLM tests. **Do not set these when gating** — on your machine the gate above runs everything for real.
 
-## What's real vs stubbed (Phase 1)
+## What's real vs stubbed
 
 Real end-to-end (Phases 1–2): multi-CSV upload (encoding/delimiter tolerant, Devanagari-safe, full load — never sampled), auto-profiling, EN/HI/Hinglish questions, LangGraph plan→SQL→execute→self-check→retry loop, cross-dataset joins, clarification on ambiguity, streamed answers + live step ticker, per-answer SQL/steps/caveats/follow-ups, **auto charts (line/bar) drawn from the executed result**, **anomaly "Data check" flags** (coverage gaps, high-null columns), **Excel/CSV export of the full result**, **save-result-as-dataset** (reusable in later questions and joins), **editable data dictionary** the agent reads on every question, persistent conversations with context, full audit trail (`GET /runs/{id}`), read-only SQL guardrails (authorizer, timeout, row caps).
 
