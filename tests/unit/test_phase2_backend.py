@@ -41,6 +41,48 @@ def test_year_axis_counts_as_line():
     assert spec["type"] == "line"
 
 
+# --- shapes real LLM SQL produces (the "no chart appeared" fix) ---
+
+def test_extra_constant_column_is_ignored():
+    spec = build_chart_spec(
+        ["year", "month", "firs"],
+        [["2025", "2025-01", 49], ["2025", "2025-02", 40], ["2025", "2025-03", 51]],
+    )
+    assert spec is not None and spec["type"] == "line"
+    assert spec["x"] == "month" and spec["y"] == "firs"
+
+
+def test_numeric_strings_are_coerced():
+    spec = build_chart_spec(["district", "n"], [["Lucknow", "276"], ["Agra", "1,120"]])
+    assert spec is not None and spec["points"][1]["y"] == 1120
+
+
+def test_swapped_column_order_detected():
+    spec = build_chart_spec(["n", "district"], [[276, "Lucknow"], [120, "Agra"]])
+    assert spec is not None
+    assert spec["x"] == "district" and spec["y"] == "n"
+
+
+def test_two_numeric_columns_chart_first_measure():
+    spec = build_chart_spec(
+        ["month", "firs", "pct_change"],
+        [["2025-01", 49, 0.0], ["2025-02", 40, -18.4], ["2025-03", 51, 27.5]],
+    )
+    assert spec is not None and spec["y"] == "firs"
+
+
+def test_true_multiseries_and_duplicate_labels_skip():
+    # two varying label columns → multi-dimensional, no naive chart
+    assert build_chart_spec(
+        ["month", "district", "n"],
+        [["2025-01", "Lucknow", 10], ["2025-01", "Agra", 4], ["2025-02", "Lucknow", 12]],
+    ) is None
+    # repeated x labels in a 2-col result → flattened series, skip
+    assert build_chart_spec(
+        ["district", "n"], [["Lucknow", 10], ["Lucknow", 12], ["Agra", 4]],
+    ) is None
+
+
 # ---------------------------------------------------------------- flags
 
 def test_month_gap_flagged():

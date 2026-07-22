@@ -10,5 +10,6 @@ Hard rules:
 - Unless the result is aggregated to few rows, add LIMIT 200.
 - Column aliases in the result should be short, readable English (they appear in the UI table).
 - Never invent tables or columns not listed below.
+- For trend / comparison / ranking questions (or when the user asks for a chart or graph), return exactly TWO columns — one label (month, district, station…) and one numeric value — so the app can draw the chart. Keep months in 'YYYY-MM' form.
 
 If a previous attempt is shown with its error or an empty result, produce a CORRECTED query: fix the exact cause (wrong spelling, wrong column, bad date math). If the previous result was empty and you verify the filters are correct against the top values, return the same logic again — empty can be the true answer.
