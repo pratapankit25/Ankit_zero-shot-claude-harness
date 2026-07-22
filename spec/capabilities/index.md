@@ -1,38 +1,20 @@
 # Capabilities Index
 
-> **Boilerplate status:** The spec-writer sub-agent creates one file per capability in this directory. Each file describes exactly one discrete thing the agent can do.
-
----
-
-## What Is a Capability?
-
-A capability is a single, discrete action or behavior the agent performs. Examples:
-- "Search the web for companies matching criteria X"
-- "Draft a personalized email given a lead profile"
-- "Send a Slack notification when a threshold is crossed"
-
-## Capabilities in This Project
-
-<!-- FILL IN: List capabilities here as they are defined. Each entry links to its spec file (no number prefix). -->
-
-| Capability | File |
-|-----------|------|
-| <!-- name --> | [name.md](name.md) |
-
-## How to Add a New Capability
-
-Run `/zero-shot-build [description]` on the existing spec. The spec-writer sub-agent will:
-1. Create a new file in this directory (`<name>.md`, no number prefix)
-2. Update this index
-3. Flag any dependencies on existing capabilities
-4. Self-review that it fits the architecture and data model before returning
-
-## Capability File Template
-
-Each capability file should answer:
-- **What it does** (one sentence)
-- **Inputs** (what data it receives)
-- **Outputs** (what it produces)
-- **External calls** (APIs, LLMs, databases it touches)
-- **Error cases** (what can go wrong and how it's handled)
-- **Success criteria** (how we test it)
+| Capability | Phase | File |
+|-----------|-------|------|
+| Upload datasets | 1 | [upload-datasets.md](upload-datasets.md) |
+| Ask a question | 1 | [ask-question.md](ask-question.md) |
+| Conversation history | 1 | [conversation-history.md](conversation-history.md) |
+| Audit trail | 1 | [audit-trail.md](audit-trail.md) |
+| Charts | 2 | [charts.md](charts.md) |
+| Export results | 2 | [export-results.md](export-results.md) |
+| Derived datasets | 2 | [derived-datasets.md](derived-datasets.md) |
+| Data dictionary | 2 | [data-dictionary.md](data-dictionary.md) |
+| Anomaly flags | 2 | [anomaly-flags.md](anomaly-flags.md) |
+| MsSQL nightly sync | 3 | [mssql-nightly-sync.md](mssql-nightly-sync.md) |
+| Data freshness | 3 | [data-freshness.md](data-freshness.md) |
+| Scheduled summaries | 3 | [scheduled-summaries.md](scheduled-summaries.md) |
+| Auth & district roles | 4 | [auth-rbac.md](auth-rbac.md) |
+| Cost dashboard | 4 | [cost-dashboard.md](cost-dashboard.md) |
+| Bilingual reports | 4 | [bilingual-reports.md](bilingual-reports.md) |
+| Email delivery | 4 | [email-delivery.md](email-delivery.md) |
