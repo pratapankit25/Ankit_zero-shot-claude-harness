@@ -1,0 +1,8 @@
+{
+  "name": "up-police-analyst-e2e",
+  "private": true,
+  "description": "Root-level E2E tooling (Playwright) — app code lives in src/ and frontend/",
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}
