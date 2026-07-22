@@ -12,7 +12,9 @@ Built spec-first with the [zero-shot SDD harness](spec/roadmap.md) — the full 
 
 ## Setup (once)
 
-Requires: Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20+, [pnpm](https://pnpm.io).
+**Windows, easiest path:** double-click **`Start-Windows.bat`** in the repo root — it checks/installs the tools, asks for your Gemini key once, builds everything, starts the server, and opens the browser itself. Keep its window open while using the app. If it shows a red PROBLEM line, screenshot the window.
+
+Manual path — requires: Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20+, [pnpm](https://pnpm.io).
 
 Linux / macOS (bash):
 
