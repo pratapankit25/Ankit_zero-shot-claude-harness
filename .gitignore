@@ -16,3 +16,6 @@ build/
 *.db-shm
 *.db-wal
 data/
+test-results/
+playwright-report/
+frontend/out/
