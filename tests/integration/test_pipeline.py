@@ -91,6 +91,20 @@ class TestGoldenPath:
         if run["status"] == "clarification":
             assert run["answer"].strip().rstrip("?") != ""
 
+    def test_trend_question_yields_chart_from_result(self, api_client, load_samples, expected):
+        """Phase 2 gate: chart points must equal the SQL result's month series."""
+        r = api_client.post("/questions", json={
+            "question": "Show Lucknow's 2025 FIRs month by month (month, count).",
+        })
+        run = r.json()["data"]
+        assert run["status"] == "completed", run.get("error")
+        chart = run.get("chart")
+        assert chart and chart["type"] == "line", f"expected a line chart, got {chart}"
+        months = expected["lucknow_2025_by_month"]
+        plotted = {p["x"][:7]: p["y"] for p in chart["points"]}
+        hits = sum(1 for m, c in months.items() if plotted.get(m) == c)
+        assert hits >= 4, f"chart points must match ground truth: {plotted} vs {months}"
+
     def test_audit_trail_written(self, api_client, load_samples, _isolated_db, expected):
         r = api_client.post("/questions", json={
             "question": "How many FIR records are there in total?",

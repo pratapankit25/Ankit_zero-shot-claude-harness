@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ConversationSummary, Dataset, RunDetail, Step } from './types'
+import {
+  Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts'
+import type { ChartSpec, ConversationSummary, Dataset, RunDetail, Step } from './types'
 
 const COMING_SOON: { label: string; phase: string; tone: string }[] = [
-  { label: 'Charts & graphs', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
-  { label: 'Excel / PDF export', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
-  { label: 'Saved datasets', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
-  { label: 'Data dictionary', phase: 'Phase 2', tone: 'text-sky-300/70 border-sky-800' },
   { label: 'MsSQL nightly sync', phase: 'Phase 3', tone: 'text-violet-300/70 border-violet-800' },
   { label: 'Scheduled summaries', phase: 'Phase 3', tone: 'text-violet-300/70 border-violet-800' },
   { label: 'Login & district roles', phase: 'Phase 4', tone: 'text-amber-300/70 border-amber-800' },
@@ -39,6 +38,53 @@ function Shield() {
   )
 }
 
+// Single-series chart per the dataviz doctrine: one hue (amber-600 ink on white),
+// thin marks with rounded data-ends, recessive grid/axes, hover tooltip, and the
+// result table always beside it as the accessible view.
+const CHART_INK = '#d97706'
+const AXIS_INK = '#64748b'
+const GRID_INK = '#e2e8f0'
+
+function AnalystChart({ spec }: { spec: ChartSpec }) {
+  const data = spec.points
+  const common = {
+    margin: { top: 8, right: 12, bottom: 4, left: 0 },
+  }
+  const tooltipStyle = {
+    fontSize: 12, borderRadius: 10, border: `1px solid ${GRID_INK}`,
+    boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
+  }
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="chart">
+      <p className="mb-1 pl-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        {spec.y} <span className="font-normal normal-case text-slate-400">by {spec.x}</span>
+      </p>
+      <ResponsiveContainer width="100%" height={240}>
+        {spec.type === 'line' ? (
+          <LineChart data={data} {...common}>
+            <CartesianGrid stroke={GRID_INK} strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="x" tick={{ fontSize: 11, fill: AXIS_INK }} tickLine={false} axisLine={{ stroke: GRID_INK }} />
+            <YAxis tick={{ fontSize: 11, fill: AXIS_INK }} tickLine={false} axisLine={false} width={40} />
+            <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: AXIS_INK, strokeDasharray: '3 3' }} />
+            <Line type="monotone" dataKey="y" name={spec.y} stroke={CHART_INK} strokeWidth={2}
+              dot={{ r: 3, fill: CHART_INK, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+          </LineChart>
+        ) : (
+          <BarChart data={data} {...common} barCategoryGap="25%">
+            <CartesianGrid stroke={GRID_INK} strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="x" tick={{ fontSize: 11, fill: AXIS_INK }} tickLine={false} axisLine={{ stroke: GRID_INK }}
+              interval={0} angle={data.length > 8 ? -30 : 0} textAnchor={data.length > 8 ? 'end' : 'middle'}
+              height={data.length > 8 ? 60 : 28} />
+            <YAxis tick={{ fontSize: 11, fill: AXIS_INK }} tickLine={false} axisLine={false} width={40} />
+            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(148,163,184,0.12)' }} />
+            <Bar dataKey="y" name={spec.y} fill={CHART_INK} radius={[4, 4, 0, 0]} maxBarSize={36} />
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 function StatusDot({ status }: { status: string }) {
   if (status === 'done') return <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">✓</span>
   if (status === 'error') return <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-rose-500 text-[9px] font-bold text-white">✕</span>
@@ -57,6 +103,11 @@ export default function Home() {
   const [banner, setBanner] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [savingFor, setSavingFor] = useState<string | null>(null)   // run_id with the save-name input open
+  const [saveName, setSaveName] = useState('')
+  const [savedFor, setSavedFor] = useState<string | null>(null)
+  const [editingCol, setEditingCol] = useState<{ ds: string; col: string } | null>(null)
+  const [editVal, setEditVal] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -124,6 +175,37 @@ export default function Home() {
     navigator.clipboard.writeText(sql)
     setCopied(runId)
     setTimeout(() => setCopied(null), 1500)
+  }
+
+  async function saveDerived(runId: string) {
+    const name = saveName.trim()
+    if (!name) return
+    const r = await fetch('/datasets/derived', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_id: runId, name }),
+    })
+    if (r.ok) {
+      setSavedFor(runId)
+      setTimeout(() => setSavedFor(null), 2500)
+      await refreshDatasets()
+    } else {
+      const j = await r.json().catch(() => null)
+      setBanner(j?.detail?.message ?? 'Could not save the dataset.')
+    }
+    setSavingFor(null)
+    setSaveName('')
+  }
+
+  async function saveColumnDescription(dsId: string, col: string) {
+    await fetch(`/datasets/${dsId}/columns/${encodeURIComponent(col)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: editVal }),
+    })
+    setEditingCol(null)
+    setEditVal('')
+    await refreshDatasets()
   }
 
   async function ask(question: string) {
@@ -238,7 +320,7 @@ export default function Home() {
                     <div className="min-w-0">
                       <p className="truncate font-medium text-white" title={d.original_filename}>{d.name}</p>
                       {d.status === 'ready' ? (
-                        <p className="text-[11px] tabular-nums text-slate-400">{d.row_count?.toLocaleString('en-IN')} rows × {d.columns.length} cols · <span className="rounded bg-slate-800 px-1 py-px text-[10px] tracking-wide text-slate-300">{d.source.toUpperCase()}</span></p>
+                        <p className="text-[11px] tabular-nums text-slate-400">{d.row_count?.toLocaleString('en-IN')} rows × {d.columns.length} cols · <span className={`rounded px-1 py-px text-[10px] tracking-wide ${d.source === 'derived' ? 'bg-amber-900/60 text-amber-300' : 'bg-slate-800 text-slate-300'}`}>{d.source.toUpperCase()}</span></p>
                       ) : (
                         <p className="text-[11px] leading-snug text-rose-300">{d.error_message}</p>
                       )}
@@ -264,14 +346,41 @@ export default function Home() {
                       {(d.profile?.warnings ?? []).map((w, i) => (
                         <p key={i} className="rounded-lg bg-amber-950/60 px-2 py-1 text-[11px] leading-snug text-amber-300">⚠ {w}</p>
                       ))}
+                      <p className="text-[10px] text-slate-500">Tip: click ✎ to tell the agent what a column means — it reads these notes on every question.</p>
                       <div className="overflow-hidden rounded-lg border border-white/10">
                         <table className="w-full text-[11px]">
                           <tbody>
                             {d.columns.slice(0, 30).map((c, ci) => (
-                              <tr key={c.name} className={`align-top ${ci % 2 ? 'bg-white/5' : ''}`}>
+                              <tr key={c.name} className={`group/col align-top ${ci % 2 ? 'bg-white/5' : ''}`}>
                                 <td className="py-1 pl-2 pr-2 font-mono text-slate-200">{c.name}</td>
                                 <td className="py-1 pr-2"><span className={`rounded px-1 py-px text-[10px] ${c.type === 'integer' || c.type === 'real' ? 'bg-sky-900/70 text-sky-300' : c.type === 'date' ? 'bg-violet-900/70 text-violet-300' : 'bg-slate-800 text-slate-400'}`}>{c.type}</span></td>
-                                <td className="py-1 pr-2 text-slate-500">{c.top_values.slice(0, 3).join(', ')}</td>
+                                <td className="py-1 pr-2 text-slate-500">
+                                  {editingCol?.ds === d.id && editingCol?.col === c.name ? (
+                                    <input
+                                      autoFocus
+                                      value={editVal}
+                                      onChange={e => setEditVal(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') saveColumnDescription(d.id, c.name)
+                                        if (e.key === 'Escape') { setEditingCol(null); setEditVal('') }
+                                      }}
+                                      onBlur={() => saveColumnDescription(d.id, c.name)}
+                                      placeholder="what this column means…"
+                                      className="w-full rounded border border-amber-500/60 bg-slate-900 px-1.5 py-0.5 text-[11px] text-amber-100 focus:outline-none"
+                                      data-testid="dictionary-input"
+                                    />
+                                  ) : (
+                                    <span className="flex items-start justify-between gap-1">
+                                      <span className={c.description ? 'italic text-amber-200/90' : ''}>
+                                        {c.description || c.top_values.slice(0, 3).join(', ')}
+                                      </span>
+                                      <button
+                                        aria-label={`Describe ${c.name}`}
+                                        onClick={() => { setEditingCol({ ds: d.id, col: c.name }); setEditVal(c.description || '') }}
+                                        className="shrink-0 rounded px-1 text-slate-600 opacity-0 transition group-hover/col:opacity-100 focus:opacity-100 hover:text-amber-300">✎</button>
+                                    </span>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -325,7 +434,7 @@ export default function Home() {
             {conversationId ? (conversations.find(c => c.id === conversationId)?.title ?? 'Conversation') : 'New conversation'}
           </p>
           <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Phase 1 · live
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Phase 2 · live
           </span>
         </div>
 
@@ -390,6 +499,18 @@ export default function Home() {
 
                   {!t.live && t.status === 'completed' && (
                     <>
+                      {(t.flags?.length ?? 0) > 0 && (
+                        <div className="mt-2.5 space-y-1.5" data-testid="flags">
+                          {t.flags!.map((f, j) => (
+                            <p key={j} className="flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs leading-snug text-orange-800">
+                              <span aria-hidden="true">⚑</span><span><span className="font-semibold">Data check:</span> {f.message}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      {t.chart && <AnalystChart spec={t.chart} />}
+
                       {t.result && t.result.rows.length > 0 && (
                         <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-slate-200 shadow-sm" data-testid="result-table">
                           <table className="w-full text-xs">
@@ -446,6 +567,42 @@ export default function Home() {
                           </details>
                         )}
                       </div>
+
+                      {t.run_id && t.sql && (t.result?.rows.length ?? 0) > 0 && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="result-actions">
+                          <a href={`/runs/${t.run_id}/export?format=xlsx`}
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                            ⬇ Excel</a>
+                          <a href={`/runs/${t.run_id}/export?format=csv`}
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                            ⬇ CSV</a>
+                          {savingFor === t.run_id ? (
+                            <span className="flex items-center gap-1.5">
+                              <input
+                                autoFocus
+                                value={saveName}
+                                onChange={e => setSaveName(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') saveDerived(t.run_id!)
+                                  if (e.key === 'Escape') { setSavingFor(null); setSaveName('') }
+                                }}
+                                placeholder="dataset name…"
+                                className="w-44 rounded-lg border border-amber-400 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-300"
+                                data-testid="save-dataset-name"
+                              />
+                              <button onClick={() => saveDerived(t.run_id!)} className="rounded-lg bg-amber-500 px-2.5 py-1 text-[11px] font-bold text-slate-900 hover:bg-amber-400">Save</button>
+                              <button onClick={() => { setSavingFor(null); setSaveName('') }} className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-50">Cancel</button>
+                            </span>
+                          ) : savedFor === t.run_id ? (
+                            <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">✓ Saved to library</span>
+                          ) : (
+                            <button onClick={() => { setSavingFor(t.run_id!); setSaveName('') }}
+                              className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-amber-500 hover:text-amber-700"
+                              data-testid="save-dataset-button">
+                              💾 Save as dataset</button>
+                          )}
+                        </div>
+                      )}
 
                       {(t.followups?.length ?? 0) > 0 && (
                         <div className="mt-3.5 flex flex-wrap gap-2" data-testid="followups">

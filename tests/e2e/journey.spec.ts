@@ -46,9 +46,16 @@ test('upload → ask (EN) → correct streamed answer with SQL → Hindi follow-
   await page.getByTestId('sql-disclosure').first().getByText('SQL').click()
   await expect(page.locator('pre').first()).toContainText(/select/i)
 
+  // export + save actions appear under the completed answer (Phase 2)
+  await expect(page.getByTestId('result-actions').first()).toBeVisible()
+
   // --- Hindi follow-up in the same conversation, answered in Hindi
   await page.getByTestId('composer').fill('अब उस जिले के 2025 के आँकड़े महीने के हिसाब से दिखाइए')
   await page.getByTestId('ask-button').click()
   const secondAnswer = page.getByTestId('answer').nth(1)
   await expect(secondAnswer).toContainText(/[ऀ-ॿ]/, { timeout: 120_000 })
+
+  // the month-wise result renders a chart with plotted marks (Phase 2)
+  await expect(page.getByTestId('chart')).toBeVisible()
+  await expect(page.getByTestId('chart').locator('svg').first()).toBeVisible()
 })

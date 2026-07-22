@@ -38,6 +38,18 @@ export interface ResultTable {
   truncated: boolean
 }
 
+export interface ChartSpec {
+  type: 'bar' | 'line'
+  x: string
+  y: string
+  points: { x: string; y: number }[]
+}
+
+export interface AnomalyFlag {
+  kind: string
+  message: string
+}
+
 export interface RunDetail {
   run_id: string
   conversation_id: string | null
@@ -50,6 +62,8 @@ export interface RunDetail {
   result: ResultTable | null
   caveats: string[]
   followups: string[]
+  chart: ChartSpec | null
+  flags: AnomalyFlag[]
   usage: { input_tokens: number; output_tokens: number }
   duration_ms: number | null
   error: string | null
